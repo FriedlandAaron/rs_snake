@@ -17,12 +17,73 @@ enum Direction {
     Right,
 }
 
+// TODO: still need to figure out how to abstract this part properly
 struct UserInput {
     input: termion::input::Keys<AsyncReader>,
 }
 
+// TODO: still need to figure out how to abstract this part properly
 struct Output {
     output: termion::raw::RawTerminal<Stdout>,
+}
+
+impl Output {
+    fn render(&mut self) {
+        self.output.flush().unwrap();
+    }
+
+    fn clear_screen(&mut self) {
+        write!(self.output, "{}", clear::All).unwrap();
+    }
+
+    fn reset_terminal(&mut self) {
+        write!(
+            self.output,
+            "{}{}{}",
+            termion::cursor::Show,
+            termion::cursor::Goto(1, 1),
+            termion::clear::All
+        )
+        .unwrap();
+    }
+
+    fn draw_food(&mut self, food: &GridCell) {
+        write!(
+            self.output,
+            "{goto}{bgColor}{food_char}{hide}{reset}",
+            goto = cursor::Goto(food.x, food.y),
+            bgColor = color::Bg(color::Green),
+            food_char = 'o',
+            hide = cursor::Hide,
+            reset = color::Bg(color::Reset),
+        )
+        .unwrap();
+    }
+
+    fn draw_snake(&mut self, snake: &VecDeque<GridCell>) {
+        let mut segments: usize = 0;
+        let len = snake.len();
+        for segment in snake {
+            let segment_char = match segments {
+                0 => 'S',
+                num if num == len - 1 => 'e',
+                1 => 'n',
+                num if num == len - 2 => 'k',
+                _ => 'a',
+            };
+            write!(
+                self.output,
+                "{goto}{bgColor}{segment_char}{hide}{reset}",
+                goto = cursor::Goto(segment.x, segment.y),
+                bgColor = color::Bg(color::Green),
+                segment_char = segment_char,
+                hide = cursor::Hide,
+                reset = color::Bg(color::Reset),
+            )
+            .unwrap();
+            segments += 1;
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -132,48 +193,13 @@ impl Game {
         collision
     }
 
-    fn render_snake(&mut self) {
-        let mut segments: usize = 0;
-        let len = self.snake.len();
-        for segment in &self.snake {
-            let segment_char = match segments {
-                0 => 'S',
-                num if num == len - 1 => 'e',
-                1 => 'n',
-                num if num == len - 2 => 'k',
-                _ => 'a',
-            };
-            write!(
-                self.output.output,
-                "{goto}{bgColor}{segment_char}{hide}{reset}",
-                goto = cursor::Goto(segment.x, segment.y),
-                bgColor = color::Bg(color::Green),
-                segment_char = segment_char,
-                hide = cursor::Hide,
-                reset = color::Bg(color::Reset),
-            )
-            .unwrap();
-            segments += 1;
-        }
-    }
-
-    fn render_food(&mut self) {
-        write!(
-            self.output.output,
-            "{goto}{bgColor}{food_char}{hide}{reset}",
-            goto = cursor::Goto(self.food.x, self.food.y),
-            bgColor = color::Bg(color::Green),
-            food_char = 'o',
-            hide = cursor::Hide,
-            reset = color::Bg(color::Reset),
-        )
-        .unwrap();
-    }
-
     fn play(&mut self) {
+        // Initial render to clear screen
+        self.output.clear_screen();
+        self.output.render();
+
+        // Start of main loop
         let mut direction_key = Key::Right;
-        write!(self.output.output, "{}{}", clear::All, cursor::Goto(1, 1)).unwrap();
-        self.output.output.flush().unwrap();
         'mainloop: loop {
             // Get input for direction
             'iter: loop {
@@ -220,22 +246,15 @@ impl Game {
             }
 
             // Clear screen
-            write!(self.output.output, "{}", clear::All).unwrap();
-            self.render_snake();
-            self.render_food();
-            self.output.output.flush().unwrap();
+            self.output.clear_screen();
+            self.output.draw_snake(&self.snake);
+            self.output.draw_food(&self.food);
+            self.output.render();
             thread::sleep(Duration::from_millis(60));
         }
 
         // Reset terminal
-        write!(
-            self.output.output,
-            "{}{}{}",
-            termion::cursor::Show,
-            termion::cursor::Goto(1, 1),
-            termion::clear::All
-        )
-        .unwrap();
+        self.output.reset_terminal();
     }
 }
 
