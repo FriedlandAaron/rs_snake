@@ -9,6 +9,13 @@ use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use termion::{async_stdin, clear, color, cursor, terminal_size, AsyncReader};
 
+#[derive(Debug)]
+enum KeyPress {
+    Direction(Direction),
+    Q,
+    None,
+}
+
 #[derive(Debug, PartialEq)]
 enum Direction {
     Up,
@@ -20,6 +27,22 @@ enum Direction {
 // TODO: still need to figure out how to abstract this part properly
 struct UserInput {
     input: termion::input::Keys<AsyncReader>,
+}
+
+impl UserInput {
+    fn get_keypress(&mut self) -> KeyPress {
+        match self.input.by_ref().last() {
+            Some(Ok(key)) => match key {
+                Key::Char('q') => KeyPress::Q,
+                Key::Up => KeyPress::Direction(Direction::Up),
+                Key::Down => KeyPress::Direction(Direction::Down),
+                Key::Left => KeyPress::Direction(Direction::Left),
+                Key::Right => KeyPress::Direction(Direction::Right),
+                _ => KeyPress::None,
+            },
+            _ => KeyPress::None,
+        }
+    }
 }
 
 // TODO: still need to figure out how to abstract this part properly
@@ -233,36 +256,28 @@ impl Game {
         self.output.render();
 
         // Start of main loop
-        let mut direction_key = Key::Right;
         'mainloop: loop {
             // Get input for direction
-            'iter: loop {
-                let temp = self.input.input.next();
-                match temp {
-                    Some(Ok(key)) => direction_key = key,
-                    _ => break 'iter,
-                }
-            }
-            match direction_key {
-                Key::Char('q') => break 'mainloop,
-                Key::Up
+            match self.input.get_keypress() {
+                KeyPress::Q => break 'mainloop,
+                KeyPress::Direction(Direction::Up)
                     if (self.direction == Direction::Left
                         || self.direction == Direction::Right) =>
                 {
                     self.direction = Direction::Up;
                 }
-                Key::Down
+                KeyPress::Direction(Direction::Down)
                     if (self.direction == Direction::Left
                         || self.direction == Direction::Right) =>
                 {
                     self.direction = Direction::Down;
                 }
-                Key::Left
+                KeyPress::Direction(Direction::Left)
                     if (self.direction == Direction::Up || self.direction == Direction::Down) =>
                 {
                     self.direction = Direction::Left;
                 }
-                Key::Right
+                KeyPress::Direction(Direction::Right)
                     if (self.direction == Direction::Up || self.direction == Direction::Down) =>
                 {
                     self.direction = Direction::Right;
@@ -303,7 +318,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let output = stdout().into_raw_mode().unwrap();
 
     let term_size = terminal_size().unwrap();
-    let playable = 1.0;
+    let playable = 0.7;
 
     let mut game = Game {
         grid: HashSet::new(),
