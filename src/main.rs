@@ -47,6 +47,34 @@ impl Output {
         .unwrap();
     }
 
+    fn draw_border(&mut self, xmin: u16, xmax: u16, ymin: u16, ymax: u16) {
+        for i in xmin - 1..=xmax + 1 {
+            for j in ymin - 1..=ymax + 1 {
+                match i {
+                    n if (n == xmin - 1 || n == xmax + 1) => write!(
+                        self.output,
+                        "{goto}{bgColor}.",
+                        goto = cursor::Goto(i, j),
+                        bgColor = color::Bg(color::White),
+                    )
+                    .unwrap(),
+                    _ => (),
+                };
+                match j {
+                    n if (n == ymin - 1 || n == ymax + 1) => write!(
+                        self.output,
+                        "{goto}{bgColor}.",
+                        goto = cursor::Goto(i, j),
+                        bgColor = color::Bg(color::White),
+                    )
+                    .unwrap(),
+                    _ => (),
+                };
+            }
+        }
+        write!(self.output, "{}", color::Bg(color::Reset),).unwrap()
+    }
+
     fn draw_food(&mut self, food: &GridCell) {
         write!(
             self.output,
@@ -116,10 +144,10 @@ impl Game {
 
         // Initialize snake
         let init_size = 5;
-        for i in 1..init_size + 1 {
+        for i in 1..=init_size {
             self.snake.push_front(GridCell {
                 x: self.max_width - i,
-                y: self.max_height / 2,
+                y: (self.max_height + self.min_height) / 2,
             });
         }
 
@@ -145,12 +173,15 @@ impl Game {
 
         // Create new head based on direction
         let new_head = match self.direction {
-            Direction::Right if head.x == self.max_width => GridCell { x: 1, y: head.y },
+            Direction::Right if head.x == self.max_width => GridCell {
+                x: self.min_width,
+                y: head.y,
+            },
             Direction::Right => GridCell {
                 x: head.x + 1,
                 y: head.y,
             },
-            Direction::Left if head.x == 1 => GridCell {
+            Direction::Left if head.x == self.min_width => GridCell {
                 x: self.max_width,
                 y: head.y,
             },
@@ -158,7 +189,7 @@ impl Game {
                 x: head.x - 1,
                 y: head.y,
             },
-            Direction::Up if head.y == 0 => GridCell {
+            Direction::Up if head.y == self.min_height => GridCell {
                 x: head.x,
                 y: self.max_height,
             },
@@ -166,7 +197,10 @@ impl Game {
                 x: head.x,
                 y: head.y - 1,
             },
-            Direction::Down if head.y == self.max_height => GridCell { x: head.x, y: 1 },
+            Direction::Down if head.y == self.max_height => GridCell {
+                x: head.x,
+                y: self.min_height,
+            },
             Direction::Down => GridCell {
                 x: head.x,
                 y: head.y + 1,
@@ -247,6 +281,12 @@ impl Game {
 
             // Clear screen
             self.output.clear_screen();
+            self.output.draw_border(
+                self.min_width,
+                self.max_width,
+                self.min_height,
+                self.max_height,
+            );
             self.output.draw_snake(&self.snake);
             self.output.draw_food(&self.food);
             self.output.render();
@@ -260,8 +300,10 @@ impl Game {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let input = async_stdin().keys();
-    let term_size = terminal_size().unwrap();
     let output = stdout().into_raw_mode().unwrap();
+
+    let term_size = terminal_size().unwrap();
+    let playable = 1.0;
 
     let mut game = Game {
         grid: HashSet::new(),
@@ -270,11 +312,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         direction: Direction::Left,
         input: UserInput { input: input },
         output: Output { output: output },
-        min_width: 1,
-        min_height: 1,
-        max_width: term_size.0,
-        max_height: term_size.1,
+        min_width: (2.0 + ((term_size.0 - 1) as f64 * (1.0 - playable))) as u16,
+        min_height: (2.0 + ((term_size.1 - 1) as f64 * (1.0 - playable))) as u16,
+        max_width: ((term_size.0 - 1) as f64 * playable) as u16,
+        max_height: ((term_size.1 - 1) as f64 * playable) as u16,
     };
+
     game.initialize();
     game.play();
 
