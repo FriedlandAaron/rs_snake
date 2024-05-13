@@ -6,15 +6,23 @@ use std::{thread, time::Duration};
 use rand::Rng;
 use termion::event::Key;
 use termion::input::TermRead;
-use termion::raw::{IntoRawMode, RawTerminal};
-use termion::{async_stdin, clear, color, cursor, terminal_size};
+use termion::raw::IntoRawMode;
+use termion::{async_stdin, clear, color, cursor, terminal_size, AsyncReader};
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 enum Direction {
     Up,
     Down,
     Left,
     Right,
+}
+
+struct UserInput {
+    input: termion::input::Keys<AsyncReader>,
+}
+
+struct Output {
+    output: termion::raw::RawTerminal<Stdout>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -23,24 +31,66 @@ struct GridCell {
     y: u16,
 }
 
-struct Snake {
-    body: VecDeque<GridCell>,
+struct Game {
+    grid: HashSet<GridCell>,
+    snake: VecDeque<GridCell>,
+    food: GridCell,
+    direction: Direction,
+    input: UserInput,
+    output: Output,
+    min_width: u16,
+    min_height: u16,
+    max_width: u16,
+    max_height: u16,
 }
 
-impl Snake {
-    fn move_snake(&mut self, direction: &Direction, term_size: (u16, u16)) {
+impl Game {
+    fn initialize(&mut self) {
+        // Initialize game grid
+        for i in self.min_width..self.max_width {
+            for j in self.min_height..self.max_height {
+                self.grid.insert(GridCell { x: i, y: j });
+            }
+        }
+
+        // Initialize snake
+        let init_size = 5;
+        for i in 1..init_size + 1 {
+            self.snake.push_front(GridCell {
+                x: self.max_width - i,
+                y: self.max_height / 2,
+            });
+        }
+
+        // Update grid by removing cells occupied by snake
+        for seg in &self.snake {
+            self.grid.remove(&seg);
+        }
+
+        // Generate food in a random cell
+        let grid_list = self.grid.iter().cloned().collect();
+        self.generate_random_food(grid_list);
+    }
+
+    fn generate_random_food(&mut self, grid_list: Vec<GridCell>) {
+        let mut rng = rand::thread_rng();
+        let random_index = rng.gen_range(0..grid_list.len());
+        self.food = self.grid.take(&grid_list[random_index]).unwrap();
+    }
+
+    fn move_snake(&mut self) {
         // Get current head
-        let head = self.body.front().unwrap();
+        let head = self.snake.front().unwrap();
 
         // Create new head based on direction
-        let new_head = match direction {
-            Direction::Right if head.x == term_size.0 => GridCell { x: 1, y: head.y },
+        let new_head = match self.direction {
+            Direction::Right if head.x == self.max_width => GridCell { x: 1, y: head.y },
             Direction::Right => GridCell {
                 x: head.x + 1,
                 y: head.y,
             },
             Direction::Left if head.x == 1 => GridCell {
-                x: term_size.0,
+                x: self.max_width,
                 y: head.y,
             },
             Direction::Left => GridCell {
@@ -49,13 +99,13 @@ impl Snake {
             },
             Direction::Up if head.y == 0 => GridCell {
                 x: head.x,
-                y: term_size.1,
+                y: self.max_height,
             },
             Direction::Up => GridCell {
                 x: head.x,
                 y: head.y - 1,
             },
-            Direction::Down if head.y == term_size.1 => GridCell { x: head.x, y: 1 },
+            Direction::Down if head.y == self.max_height => GridCell { x: head.x, y: 1 },
             Direction::Down => GridCell {
                 x: head.x,
                 y: head.y + 1,
@@ -63,17 +113,17 @@ impl Snake {
         };
 
         // Push new head to start of snake
-        self.body.push_front(new_head);
+        self.snake.push_front(new_head);
 
         // Remove old tail from snake
-        self.body.pop_back();
+        self.snake.pop_back();
     }
 
     fn check_collision(&mut self) -> bool {
         let mut collision = false;
-        let head = self.body.front().unwrap();
+        let head = self.snake.front().unwrap();
 
-        for segment in self.body.range(1..) {
+        for segment in self.snake.range(1..) {
             if head == segment {
                 collision = true;
                 break;
@@ -81,141 +131,133 @@ impl Snake {
         }
         collision
     }
-}
 
-fn render_snake(screen: &mut RawTerminal<Stdout>, snake: &Snake) {
-    let mut segments: usize = 0;
-    let len = snake.body.len();
-    for segment in &snake.body {
-        let segment_char = match segments {
-            0 => 'H',
-            num if num == len - 1 => 'T',
-            _ => 'm',
-        };
+    fn render_snake(&mut self) {
+        let mut segments: usize = 0;
+        let len = self.snake.len();
+        for segment in &self.snake {
+            let segment_char = match segments {
+                0 => 'S',
+                num if num == len - 1 => 'e',
+                1 => 'n',
+                num if num == len - 2 => 'k',
+                _ => 'a',
+            };
+            write!(
+                self.output.output,
+                "{goto}{bgColor}{segment_char}{hide}{reset}",
+                goto = cursor::Goto(segment.x, segment.y),
+                bgColor = color::Bg(color::Green),
+                segment_char = segment_char,
+                hide = cursor::Hide,
+                reset = color::Bg(color::Reset),
+            )
+            .unwrap();
+            segments += 1;
+        }
+    }
+
+    fn render_food(&mut self) {
         write!(
-            screen,
-            "{goto}{bgColor}{segment_char}{hide}{reset}",
-            goto = cursor::Goto(segment.x, segment.y),
+            self.output.output,
+            "{goto}{bgColor}{food_char}{hide}{reset}",
+            goto = cursor::Goto(self.food.x, self.food.y),
             bgColor = color::Bg(color::Green),
-            segment_char = segment_char,
+            food_char = 'o',
             hide = cursor::Hide,
             reset = color::Bg(color::Reset),
         )
         .unwrap();
-        segments += 1;
     }
-}
 
-fn render_food(screen: &mut RawTerminal<Stdout>, food: &GridCell) {
-    write!(
-        screen,
-        "{goto}{bgColor}{food_char}{hide}{reset}",
-        goto = cursor::Goto(food.x, food.y),
-        bgColor = color::Bg(color::Green),
-        food_char = 'F',
-        hide = cursor::Hide,
-        reset = color::Bg(color::Reset),
-    )
-    .unwrap();
-}
+    fn play(&mut self) {
+        let mut direction_key = Key::Right;
+        write!(self.output.output, "{}{}", clear::All, cursor::Goto(1, 1)).unwrap();
+        self.output.output.flush().unwrap();
+        'mainloop: loop {
+            // Get input for direction
+            'iter: loop {
+                let temp = self.input.input.next();
+                match temp {
+                    Some(Ok(key)) => direction_key = key,
+                    _ => break 'iter,
+                }
+            }
+            match direction_key {
+                Key::Char('q') => break 'mainloop,
+                Key::Up
+                    if (self.direction == Direction::Left
+                        || self.direction == Direction::Right) =>
+                {
+                    self.direction = Direction::Up;
+                }
+                Key::Down
+                    if (self.direction == Direction::Left
+                        || self.direction == Direction::Right) =>
+                {
+                    self.direction = Direction::Down;
+                }
+                Key::Left
+                    if (self.direction == Direction::Up || self.direction == Direction::Down) =>
+                {
+                    self.direction = Direction::Left;
+                }
+                Key::Right
+                    if (self.direction == Direction::Up || self.direction == Direction::Down) =>
+                {
+                    self.direction = Direction::Right;
+                }
+                _ => (),
+            }
+            self.move_snake();
+            if self.check_collision() {
+                break 'mainloop;
+            }
+            if self.snake.front().unwrap() == &self.food {
+                self.snake.push_back(self.snake.back().unwrap().clone());
+                let grid_list = self.grid.iter().cloned().collect();
+                self.generate_random_food(grid_list);
+            }
 
-fn generate_random_food(grid: &HashSet<GridCell>) -> &GridCell {
-    let mut rng = rand::thread_rng();
-    let grid_list: Vec<_> = grid.iter().collect();
-    let random_index = rng.gen_range(0..grid_list.len());
-    let cell = grid_list[random_index];
-    cell
+            // Clear screen
+            write!(self.output.output, "{}", clear::All).unwrap();
+            self.render_snake();
+            self.render_food();
+            self.output.output.flush().unwrap();
+            thread::sleep(Duration::from_millis(60));
+        }
+
+        // Reset terminal
+        write!(
+            self.output.output,
+            "{}{}{}",
+            termion::cursor::Show,
+            termion::cursor::Goto(1, 1),
+            termion::clear::All
+        )
+        .unwrap();
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut stdin = async_stdin().keys();
+    let input = async_stdin().keys();
     let term_size = terminal_size().unwrap();
+    let output = stdout().into_raw_mode().unwrap();
 
-    let mut grid: HashSet<GridCell> = HashSet::new();
-    for i in 1..term_size.0 {
-        for j in 1..term_size.1 {
-            grid.insert(GridCell { x: i, y: j });
-        }
-    }
-
-    let mut snake2 = Snake {
-        body: VecDeque::new(),
+    let mut game = Game {
+        grid: HashSet::new(),
+        snake: VecDeque::new(),
+        food: GridCell { x: 0, y: 0 },
+        direction: Direction::Left,
+        input: UserInput { input: input },
+        output: Output { output: output },
+        min_width: 1,
+        min_height: 1,
+        max_width: term_size.0,
+        max_height: term_size.1,
     };
-    snake2.body.push_back(GridCell {
-        x: term_size.0 - 1,
-        y: term_size.1 / 2,
-    });
-    snake2.body.push_back(GridCell {
-        x: term_size.0 - 2,
-        y: term_size.1 / 2,
-    });
-    snake2.body.push_back(GridCell {
-        x: term_size.0 - 3,
-        y: term_size.1 / 2,
-    });
-
-    for seg in &snake2.body {
-        grid.remove(&seg);
-    }
-
-    let mut food = generate_random_food(&grid);
-
-    let mut direction = Direction::Right;
-    let mut direction_key = Key::Right;
-    let mut screen = stdout().into_raw_mode().unwrap();
-    write!(screen, "{}{}", clear::All, cursor::Goto(1, 1)).unwrap();
-    screen.flush().unwrap();
-    'mainloop: loop {
-        // Clear screen
-        write!(screen, "{}", clear::All).unwrap();
-
-        // Get input for direction
-        'iter: loop {
-            let temp = stdin.next();
-            match temp {
-                Some(Ok(key)) => direction_key = key,
-                _ => break 'iter,
-            }
-        }
-        match direction_key {
-            Key::Char('q') => break 'mainloop,
-            Key::Up if (direction == Direction::Left || direction == Direction::Right) => {
-                direction = Direction::Up;
-            }
-            Key::Down if (direction == Direction::Left || direction == Direction::Right) => {
-                direction = Direction::Down;
-            }
-            Key::Left if (direction == Direction::Up || direction == Direction::Down) => {
-                direction = Direction::Left;
-            }
-            Key::Right if (direction == Direction::Up || direction == Direction::Down) => {
-                direction = Direction::Right;
-            }
-            _ => (),
-        }
-        snake2.move_snake(&direction, term_size);
-        if snake2.body.front().unwrap() == food {
-            snake2.body.push_back(snake2.body.back().unwrap().clone());
-            food = generate_random_food(&grid);
-        }
-        render_snake(&mut screen, &snake2);
-        render_food(&mut screen, food);
-        screen.flush().unwrap();
-        if snake2.check_collision() {
-            break 'mainloop;
-        }
-        thread::sleep(Duration::from_millis(80));
-    }
-
-    // Reset terminal
-    write!(
-        screen,
-        "{}{}{}",
-        termion::cursor::Show,
-        termion::cursor::Goto(1, 1),
-        termion::clear::All
-    )
-    .unwrap();
+    game.initialize();
+    game.play();
 
     Ok(())
 }
