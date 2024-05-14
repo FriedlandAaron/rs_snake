@@ -232,11 +232,15 @@ impl Game {
             },
         };
 
+        // Remove new head from grid
+        self.grid.remove(&new_head);
         // Push new head to start of snake
         self.snake.push_front(new_head);
 
         // Remove old tail from snake
-        self.snake.pop_back();
+        let old_tail = self.snake.pop_back().unwrap();
+        // Put old tail back into grid
+        self.grid.insert(old_tail);
     }
 
     fn check_collision(&mut self) -> bool {
