@@ -159,8 +159,8 @@ struct Game {
 impl Game {
     fn initialize(&mut self) {
         // Initialize game grid
-        for i in self.min_width..self.max_width {
-            for j in self.min_height..self.max_height {
+        for i in self.min_width..=self.max_width {
+            for j in self.min_height..=self.max_height {
                 self.grid.insert(GridCell { x: i, y: j });
             }
         }
@@ -196,33 +196,35 @@ impl Game {
 
         // Create new head based on direction
         let new_head = match self.direction {
+            // If snake is at an edge, wrap around to other side
             Direction::Right if head.x == self.max_width => GridCell {
                 x: self.min_width,
-                y: head.y,
-            },
-            Direction::Right => GridCell {
-                x: head.x + 1,
                 y: head.y,
             },
             Direction::Left if head.x == self.min_width => GridCell {
                 x: self.max_width,
                 y: head.y,
             },
-            Direction::Left => GridCell {
-                x: head.x - 1,
-                y: head.y,
-            },
             Direction::Up if head.y == self.min_height => GridCell {
                 x: head.x,
                 y: self.max_height,
             },
-            Direction::Up => GridCell {
-                x: head.x,
-                y: head.y - 1,
-            },
             Direction::Down if head.y == self.max_height => GridCell {
                 x: head.x,
                 y: self.min_height,
+            },
+            // If snake isn't at an edge, advance one cell in the chosen direction
+            Direction::Right => GridCell {
+                x: head.x + 1,
+                y: head.y,
+            },
+            Direction::Left => GridCell {
+                x: head.x - 1,
+                y: head.y,
+            },
+            Direction::Up => GridCell {
+                x: head.x,
+                y: head.y - 1,
             },
             Direction::Down => GridCell {
                 x: head.x,
