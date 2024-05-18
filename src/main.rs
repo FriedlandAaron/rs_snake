@@ -56,7 +56,7 @@ impl Output {
     }
 
     fn clear_screen(&mut self) {
-        write!(self.output, "{}", clear::All).unwrap();
+        write!(self.output, "{}{}", clear::All, cursor::Hide).unwrap();
     }
 
     fn reset_terminal(&mut self) {
@@ -101,11 +101,10 @@ impl Output {
     fn draw_food(&mut self, food: &GridCell) {
         write!(
             self.output,
-            "{goto}{bgColor}{food_char}{hide}{reset}",
+            "{goto}{bgColor}{food_char}{reset}",
             goto = cursor::Goto(food.x, food.y),
             bgColor = color::Bg(color::Green),
             food_char = 'o',
-            hide = cursor::Hide,
             reset = color::Bg(color::Reset),
         )
         .unwrap();
@@ -124,11 +123,10 @@ impl Output {
             };
             write!(
                 self.output,
-                "{goto}{bgColor}{segment_char}{hide}{reset}",
+                "{goto}{bgColor}{segment_char}{reset}",
                 goto = cursor::Goto(segment.x, segment.y),
                 bgColor = color::Bg(color::Green),
                 segment_char = segment_char,
-                hide = cursor::Hide,
                 reset = color::Bg(color::Reset),
             )
             .unwrap();
@@ -197,39 +195,42 @@ impl Game {
         // Create new head based on direction
         let new_head = match self.direction {
             // If snake is at an edge, wrap around to other side
-            Direction::Right if head.x == self.max_width => GridCell {
-                x: self.min_width,
-                y: head.y,
-            },
-            Direction::Left if head.x == self.min_width => GridCell {
-                x: self.max_width,
-                y: head.y,
-            },
-            Direction::Up if head.y == self.min_height => GridCell {
-                x: head.x,
-                y: self.max_height,
-            },
-            Direction::Down if head.y == self.max_height => GridCell {
-                x: head.x,
-                y: self.min_height,
-            },
-            // If snake isn't at an edge, advance one cell in the chosen direction
-            Direction::Right => GridCell {
-                x: head.x + 1,
-                y: head.y,
-            },
-            Direction::Left => GridCell {
-                x: head.x - 1,
-                y: head.y,
-            },
-            Direction::Up => GridCell {
-                x: head.x,
-                y: head.y - 1,
-            },
-            Direction::Down => GridCell {
-                x: head.x,
-                y: head.y + 1,
-            },
+            Direction::Right => {
+                let x = if head.x == self.max_width {
+                    self.min_width
+                } else {
+                    head.x + 1
+                };
+                let y = head.y;
+                GridCell { x, y }
+            }
+            Direction::Left => {
+                let x = if head.x == self.min_width {
+                    self.max_width
+                } else {
+                    head.x - 1
+                };
+                let y = head.y;
+                GridCell { x, y }
+            }
+            Direction::Up => {
+                let x = head.x;
+                let y = if head.y == self.min_height {
+                    self.max_height
+                } else {
+                    head.y - 1
+                };
+                GridCell { x, y }
+            }
+            Direction::Down => {
+                let x = head.x;
+                let y = if head.y == self.max_height {
+                    self.min_height
+                } else {
+                    head.y + 1
+                };
+                GridCell { x, y }
+            }
         };
 
         // Remove new head from grid
