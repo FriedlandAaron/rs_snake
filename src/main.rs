@@ -76,7 +76,7 @@ impl Output {
                 match i {
                     n if (n == xmin - 1 || n == xmax + 1) => write!(
                         self.output,
-                        "{goto}{bgColor}.",
+                        "{goto}{bgColor} ",
                         goto = cursor::Goto(i, j),
                         bgColor = color::Bg(color::White),
                     )
@@ -86,7 +86,7 @@ impl Output {
                 match j {
                     n if (n == ymin - 1 || n == ymax + 1) => write!(
                         self.output,
-                        "{goto}{bgColor}.",
+                        "{goto}{bgColor} ",
                         goto = cursor::Goto(i, j),
                         bgColor = color::Bg(color::White),
                     )
@@ -101,11 +101,13 @@ impl Output {
     fn draw_food(&mut self, food: &GridCell) {
         write!(
             self.output,
-            "{goto}{bgColor}{food_char}{reset}",
+            "{goto}{bgColor}{fgColor}{food_char}{fgreset}{bgreset}",
             goto = cursor::Goto(food.x, food.y),
-            bgColor = color::Bg(color::Green),
-            food_char = 'o',
-            reset = color::Bg(color::Reset),
+            bgColor = color::Bg(color::Red),
+            fgColor = color::Fg(color::LightGreen),
+            food_char = '\u{00D3}',
+            fgreset = color::Fg(color::Reset),
+            bgreset = color::Bg(color::Reset),
         )
         .unwrap();
     }
