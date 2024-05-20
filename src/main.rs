@@ -6,7 +6,8 @@ use std::{thread, time::Duration};
 use rand::Rng;
 use termion::event::Key;
 use termion::input::TermRead;
-use termion::raw::IntoRawMode;
+use termion::raw::{IntoRawMode, RawTerminal};
+use termion::screen::IntoAlternateScreen;
 use termion::{async_stdin, clear, color, cursor, terminal_size, AsyncReader};
 
 #[derive(Debug)]
@@ -47,7 +48,7 @@ impl UserInput {
 
 // TODO: still need to figure out how to abstract this part properly
 struct Output {
-    output: termion::raw::RawTerminal<Stdout>,
+    output: termion::screen::AlternateScreen<RawTerminal<Stdout>>,
 }
 
 impl Output {
@@ -324,7 +325,7 @@ impl Game {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let input = async_stdin().keys();
-    let output = stdout().into_raw_mode().unwrap();
+    let output = stdout().into_raw_mode()?.into_alternate_screen()?;
 
     let term_size = terminal_size().unwrap();
     let playable = 0.7;
