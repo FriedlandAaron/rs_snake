@@ -260,6 +260,13 @@ impl Game {
         collision
     }
 
+    fn vertical(&self) -> bool {
+        match self.direction {
+            Direction::Up | Direction::Down => true,
+            Direction::Left | Direction::Right => false,
+        }
+    }
+
     fn play(&mut self) {
         // Initial render to clear screen
         self.output.clear_screen();
@@ -315,7 +322,7 @@ impl Game {
             self.output.draw_snake(&self.snake);
             self.output.draw_food(&self.food);
             self.output.render();
-            thread::sleep(Duration::from_millis(60));
+            thread::sleep(Duration::from_millis(if self.vertical() { 80 } else { 60 }));
         }
 
         // Reset terminal
