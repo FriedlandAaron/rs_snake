@@ -10,10 +10,12 @@ use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::IntoAlternateScreen;
 use termion::{async_stdin, clear, color, cursor, terminal_size, AsyncReader};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum KeyPress {
     Direction(Direction),
     Q,
+    P,
+    Other,
     None,
 }
 
@@ -35,11 +37,12 @@ impl UserInput {
         match self.input.by_ref().last() {
             Some(Ok(key)) => match key {
                 Key::Char('q') => KeyPress::Q,
+                Key::Char('p') => KeyPress::P,
                 Key::Up => KeyPress::Direction(Direction::Up),
                 Key::Down => KeyPress::Direction(Direction::Down),
                 Key::Left => KeyPress::Direction(Direction::Left),
                 Key::Right => KeyPress::Direction(Direction::Right),
-                _ => KeyPress::None,
+                _ => KeyPress::Other,
             },
             _ => KeyPress::None,
         }
@@ -274,29 +277,30 @@ impl Game {
 
         // Start of main loop
         'mainloop: loop {
-            // Get input for direction
+            // Handle user input
             match self.input.get_keypress() {
+                // Pause the game
+                KeyPress::P => loop {
+                    // Sleep here to let input thread have some control
+                    thread::sleep(Duration::from_millis(10));
+                    match self.input.get_keypress() {
+                        KeyPress::None | KeyPress::Other => (),
+                        _ => break,
+                    }
+                },
+                // Quit the game
                 KeyPress::Q => break 'mainloop,
-                KeyPress::Direction(Direction::Up)
-                    if (self.direction == Direction::Left
-                        || self.direction == Direction::Right) =>
-                {
+                // Get pressed direction key
+                KeyPress::Direction(Direction::Up) if !self.vertical() => {
                     self.direction = Direction::Up;
                 }
-                KeyPress::Direction(Direction::Down)
-                    if (self.direction == Direction::Left
-                        || self.direction == Direction::Right) =>
-                {
+                KeyPress::Direction(Direction::Down) if !self.vertical() => {
                     self.direction = Direction::Down;
                 }
-                KeyPress::Direction(Direction::Left)
-                    if (self.direction == Direction::Up || self.direction == Direction::Down) =>
-                {
+                KeyPress::Direction(Direction::Left) if self.vertical() => {
                     self.direction = Direction::Left;
                 }
-                KeyPress::Direction(Direction::Right)
-                    if (self.direction == Direction::Up || self.direction == Direction::Down) =>
-                {
+                KeyPress::Direction(Direction::Right) if self.vertical() => {
                     self.direction = Direction::Right;
                 }
                 _ => (),
