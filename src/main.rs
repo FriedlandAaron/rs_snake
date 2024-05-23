@@ -28,11 +28,11 @@ enum Direction {
 }
 
 // TODO: still need to figure out how to abstract this part properly
-struct UserInput {
+struct GameInput {
     input: termion::input::Keys<AsyncReader>,
 }
 
-impl UserInput {
+impl GameInput {
     fn get_keypress(&mut self) -> KeyPress {
         match self.input.by_ref().last() {
             Some(Ok(key)) => match key {
@@ -50,11 +50,11 @@ impl UserInput {
 }
 
 // TODO: still need to figure out how to abstract this part properly
-struct Output {
+struct GameOutput {
     output: termion::screen::AlternateScreen<RawTerminal<Stdout>>,
 }
 
-impl Output {
+impl GameOutput {
     fn render(&mut self) {
         self.output.flush().unwrap();
     }
@@ -152,46 +152,80 @@ struct Game {
     snake: VecDeque<GridCell>,
     food: GridCell,
     direction: Direction,
-    input: UserInput,
-    output: Output,
+    input: GameInput,
+    output: GameOutput,
     min_width: u16,
     min_height: u16,
     max_width: u16,
     max_height: u16,
+    speed: u64,
 }
 
 impl Game {
-    fn initialize(&mut self) {
+    fn new(
+        input: GameInput,
+        output: GameOutput,
+        term_max_x: u16,
+        term_max_y: u16,
+        playable: f64,
+    ) -> Game {
+        let min_width = (2.0 + ((term_max_x - 1) as f64 * (1.0 - playable))) as u16;
+        let min_height = (2.0 + ((term_max_y - 1) as f64 * (1.0 - playable))) as u16;
+        let max_width = ((term_max_x - 1) as f64 * playable) as u16;
+        let max_height = ((term_max_y - 1) as f64 * playable) as u16;
+
         // Initialize game grid
-        for i in self.min_width..=self.max_width {
-            for j in self.min_height..=self.max_height {
-                self.grid.insert(GridCell { x: i, y: j });
+        let mut grid = HashSet::new();
+        for i in min_width..=max_width {
+            for j in min_height..=max_height {
+                grid.insert(GridCell { x: i, y: j });
             }
         }
 
         // Initialize snake
+        let mut snake = VecDeque::new();
         let init_size = 5;
         for i in 1..=init_size {
-            self.snake.push_front(GridCell {
-                x: self.max_width - i,
-                y: (self.max_height + self.min_height) / 2,
+            snake.push_front(GridCell {
+                x: max_width - i,
+                y: (max_height + min_height) / 2,
             });
         }
 
         // Update grid by removing cells occupied by snake
-        for seg in &self.snake {
-            self.grid.remove(&seg);
+        for seg in &snake {
+            grid.remove(seg);
         }
 
         // Generate food in a random cell
-        let grid_list = self.grid.iter().cloned().collect();
-        self.generate_random_food(grid_list);
+        let food = Game::generate_random_food(&grid);
+
+        // Initialize starting movement direction
+        let direction = Direction::Left;
+
+        // Initialize game speed
+        let speed = 60;
+
+        Game {
+            grid,
+            snake,
+            food,
+            direction,
+            input,
+            output,
+            min_width,
+            min_height,
+            max_width,
+            max_height,
+            speed,
+        }
     }
 
-    fn generate_random_food(&mut self, grid_list: Vec<GridCell>) {
+    fn generate_random_food(grid: &HashSet<GridCell>) -> GridCell {
         let mut rng = rand::thread_rng();
+        let grid_list: Vec<&GridCell> = grid.iter().by_ref().collect();
         let random_index = rng.gen_range(0..grid_list.len());
-        self.food = self.grid.take(&grid_list[random_index]).unwrap();
+        grid_list[random_index].clone()
     }
 
     fn move_snake(&mut self) {
@@ -310,9 +344,12 @@ impl Game {
                 break 'mainloop;
             }
             if self.snake.front().unwrap() == &self.food {
+                for seg in &self.snake {
+                    self.grid.remove(seg);
+                }
                 self.snake.push_back(self.snake.back().unwrap().clone());
-                let grid_list = self.grid.iter().cloned().collect();
-                self.generate_random_food(grid_list);
+                self.food = Game::generate_random_food(&self.grid);
+                self.grid.remove(&self.food);
             }
 
             // Clear screen
@@ -326,7 +363,11 @@ impl Game {
             self.output.draw_snake(&self.snake);
             self.output.draw_food(&self.food);
             self.output.render();
-            thread::sleep(Duration::from_millis(if self.vertical() { 80 } else { 60 }));
+            thread::sleep(Duration::from_millis(if self.vertical() {
+                self.speed + 20
+            } else {
+                self.speed
+            }));
         }
 
         // Reset terminal
@@ -338,23 +379,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let input = async_stdin().keys();
     let output = stdout().into_raw_mode()?.into_alternate_screen()?;
 
-    let term_size = terminal_size().unwrap();
+    let term_size = terminal_size()?;
     let playable = 0.7;
 
-    let mut game = Game {
-        grid: HashSet::new(),
-        snake: VecDeque::new(),
-        food: GridCell { x: 0, y: 0 },
-        direction: Direction::Left,
-        input: UserInput { input: input },
-        output: Output { output: output },
-        min_width: (2.0 + ((term_size.0 - 1) as f64 * (1.0 - playable))) as u16,
-        min_height: (2.0 + ((term_size.1 - 1) as f64 * (1.0 - playable))) as u16,
-        max_width: ((term_size.0 - 1) as f64 * playable) as u16,
-        max_height: ((term_size.1 - 1) as f64 * playable) as u16,
-    };
+    let mut game = Game::new(
+        GameInput { input },
+        GameOutput { output },
+        term_size.0,
+        term_size.1,
+        playable,
+    );
 
-    game.initialize();
     game.play();
 
     Ok(())
