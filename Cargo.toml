@@ -1,7 +1,9 @@
 [package]
 name = "rs_snake"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
+description = "The classic 'Snake' game as a terminal application."
+license = "Unlicense"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
