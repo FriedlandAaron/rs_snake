@@ -16,6 +16,8 @@ use termion::{async_stdin, clear, color, cursor, terminal_size, AsyncReader};
 struct Args {
     #[arg(short, long, value_enum, default_value_t = GridSize::Small)]
     grid_size: GridSize,
+    #[arg(short, long, value_enum, default_value_t = Speed::High)]
+    speed: Speed,
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -31,6 +33,23 @@ impl GridSize {
             GridSize::Small => 0.7,
             GridSize::Medium => 0.85,
             GridSize::Large => 1.0,
+        }
+    }
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+enum Speed {
+    Slow,
+    Moderate,
+    High,
+}
+
+impl Speed {
+    fn value(&self) -> u64 {
+        match self {
+            Speed::Slow => 120,
+            Speed::Moderate => 90,
+            Speed::High => 60,
         }
     }
 }
@@ -193,6 +212,7 @@ impl Game {
         term_max_x: u16,
         term_max_y: u16,
         playable: f64,
+        speed: u64,
     ) -> Game {
         let min_width = (2.0 + ((term_max_x - 1) as f64 * (1.0 - playable))) as u16;
         let min_height = (2.0 + ((term_max_y - 1) as f64 * (1.0 - playable))) as u16;
@@ -227,9 +247,6 @@ impl Game {
 
         // Initialize starting movement direction
         let direction = Direction::Left;
-
-        // Initialize game speed
-        let speed = 60;
 
         Game {
             grid,
@@ -402,12 +419,13 @@ impl Game {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
-    println!("{:?}", args.grid_size.value());
+    println!("{:?} {:?}", args.grid_size.value(), args.speed.value());
     let input = async_stdin().keys();
     let output = stdout().into_raw_mode()?.into_alternate_screen()?;
 
     let term_size = terminal_size()?;
     let playable = args.grid_size.value();
+    let speed = args.speed.value();
 
     let mut game = Game::new(
         GameInput { input },
@@ -415,6 +433,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         term_size.0,
         term_size.1,
         playable,
+        speed,
     );
 
     game.play();
