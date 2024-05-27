@@ -3,12 +3,15 @@ use std::error::Error;
 use std::io::{stdout, Stdout, Write};
 use std::{thread, time::Duration};
 
+use clap::Parser;
 use rand::Rng;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::IntoAlternateScreen;
 use termion::{async_stdin, clear, color, cursor, terminal_size, AsyncReader};
+
+mod parser;
 
 #[derive(Debug, PartialEq)]
 enum KeyPress {
@@ -168,6 +171,7 @@ impl Game {
         term_max_x: u16,
         term_max_y: u16,
         playable: f64,
+        speed: u64,
     ) -> Game {
         let min_width = (2.0 + ((term_max_x - 1) as f64 * (1.0 - playable))) as u16;
         let min_height = (2.0 + ((term_max_y - 1) as f64 * (1.0 - playable))) as u16;
@@ -202,9 +206,6 @@ impl Game {
 
         // Initialize starting movement direction
         let direction = Direction::Left;
-
-        // Initialize game speed
-        let speed = 60;
 
         Game {
             grid,
@@ -376,11 +377,13 @@ impl Game {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let args = parser::ArgsParser::parse();
     let input = async_stdin().keys();
     let output = stdout().into_raw_mode()?.into_alternate_screen()?;
 
     let term_size = terminal_size()?;
-    let playable = 0.7;
+    let playable = args.grid_size.value();
+    let speed = args.speed.value();
 
     let mut game = Game::new(
         GameInput { input },
@@ -388,6 +391,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         term_size.0,
         term_size.1,
         playable,
+        speed,
     );
 
     game.play();
