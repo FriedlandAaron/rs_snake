@@ -3,7 +3,7 @@ use std::error::Error;
 use std::io::{stdout, Stdout, Write};
 use std::{thread, time::Duration};
 
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use rand::Rng;
 use termion::event::Key;
 use termion::input::TermRead;
@@ -11,48 +11,7 @@ use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::IntoAlternateScreen;
 use termion::{async_stdin, clear, color, cursor, terminal_size, AsyncReader};
 
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct Args {
-    #[arg(short, long, value_enum, default_value_t = GridSize::Small)]
-    grid_size: GridSize,
-    #[arg(short, long, value_enum, default_value_t = Speed::High)]
-    speed: Speed,
-}
-
-#[derive(ValueEnum, Clone, Debug)]
-enum GridSize {
-    Small,
-    Medium,
-    Large,
-}
-
-impl GridSize {
-    fn value(&self) -> f64 {
-        match self {
-            GridSize::Small => 0.7,
-            GridSize::Medium => 0.85,
-            GridSize::Large => 1.0,
-        }
-    }
-}
-
-#[derive(ValueEnum, Clone, Debug)]
-enum Speed {
-    Slow,
-    Moderate,
-    High,
-}
-
-impl Speed {
-    fn value(&self) -> u64 {
-        match self {
-            Speed::Slow => 120,
-            Speed::Moderate => 90,
-            Speed::High => 60,
-        }
-    }
-}
+mod parser;
 
 #[derive(Debug, PartialEq)]
 enum KeyPress {
@@ -418,7 +377,7 @@ impl Game {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args = Args::parse();
+    let args = parser::ArgsParser::parse();
     println!("{:?} {:?}", args.grid_size.value(), args.speed.value());
     let input = async_stdin().keys();
     let output = stdout().into_raw_mode()?.into_alternate_screen()?;
