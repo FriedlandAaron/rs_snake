@@ -5,22 +5,14 @@ use std::{thread, time::Duration};
 
 use clap::Parser;
 use rand::Rng;
-use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::IntoAlternateScreen;
-use termion::{async_stdin, clear, color, cursor, terminal_size, AsyncReader};
+use termion::{async_stdin, clear, color, cursor, terminal_size};
 
+use game_input::KeyPress;
+mod game_input;
 mod parser;
-
-#[derive(Debug, PartialEq)]
-enum KeyPress {
-    Direction(Direction),
-    Q,
-    P,
-    Other,
-    None,
-}
 
 #[derive(Debug, PartialEq)]
 enum Direction {
@@ -28,28 +20,6 @@ enum Direction {
     Down,
     Left,
     Right,
-}
-
-// TODO: still need to figure out how to abstract this part properly
-struct GameInput {
-    input: termion::input::Keys<AsyncReader>,
-}
-
-impl GameInput {
-    fn get_keypress(&mut self) -> KeyPress {
-        match self.input.by_ref().last() {
-            Some(Ok(key)) => match key {
-                Key::Char('q') => KeyPress::Q,
-                Key::Char('p') => KeyPress::P,
-                Key::Up => KeyPress::Direction(Direction::Up),
-                Key::Down => KeyPress::Direction(Direction::Down),
-                Key::Left => KeyPress::Direction(Direction::Left),
-                Key::Right => KeyPress::Direction(Direction::Right),
-                _ => KeyPress::Other,
-            },
-            _ => KeyPress::None,
-        }
-    }
 }
 
 // TODO: still need to figure out how to abstract this part properly
@@ -155,7 +125,7 @@ struct Game {
     snake: VecDeque<GridCell>,
     food: GridCell,
     direction: Direction,
-    input: GameInput,
+    input: game_input::GameInput,
     output: GameOutput,
     min_width: u16,
     min_height: u16,
@@ -166,7 +136,7 @@ struct Game {
 
 impl Game {
     fn new(
-        input: GameInput,
+        input: game_input::GameInput,
         output: GameOutput,
         term_max_x: u16,
         term_max_y: u16,
@@ -386,7 +356,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let speed = args.speed.value();
 
     let mut game = Game::new(
-        GameInput { input },
+        game_input::GameInput { input },
         GameOutput { output },
         term_size.0,
         term_size.1,
