@@ -378,7 +378,6 @@ impl Game {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args = parser::ArgsParser::parse();
-    println!("{:?} {:?}", args.grid_size.value(), args.speed.value());
     let input = async_stdin().keys();
     let output = stdout().into_raw_mode()?.into_alternate_screen()?;
 
