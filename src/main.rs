@@ -5,22 +5,14 @@ use std::{thread, time::Duration};
 
 use clap::Parser;
 use rand::Rng;
-use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::IntoAlternateScreen;
-use termion::{async_stdin, clear, color, cursor, terminal_size, AsyncReader};
+use termion::{async_stdin, clear, color, cursor, terminal_size};
 
+use game_input::KeyPress;
+mod game_input;
 mod parser;
-
-#[derive(Debug, PartialEq)]
-enum KeyPress {
-    Direction(Direction),
-    Q,
-    P,
-    Other,
-    None,
-}
 
 #[derive(Debug, PartialEq)]
 enum Direction {
@@ -30,24 +22,11 @@ enum Direction {
     Right,
 }
 
-// TODO: still need to figure out how to abstract this part properly
-struct GameInput {
-    input: termion::input::Keys<AsyncReader>,
-}
-
-impl GameInput {
-    fn get_keypress(&mut self) -> KeyPress {
-        match self.input.by_ref().last() {
-            Some(Ok(key)) => match key {
-                Key::Char('q') => KeyPress::Q,
-                Key::Char('p') => KeyPress::P,
-                Key::Up => KeyPress::Direction(Direction::Up),
-                Key::Down => KeyPress::Direction(Direction::Down),
-                Key::Left => KeyPress::Direction(Direction::Left),
-                Key::Right => KeyPress::Direction(Direction::Right),
-                _ => KeyPress::Other,
-            },
-            _ => KeyPress::None,
+impl Direction {
+    fn vertical(&self) -> bool {
+        match self {
+            Self::Up | Self::Down => true,
+            Self::Left | Self::Right => false,
         }
     }
 }
@@ -155,7 +134,7 @@ struct Game {
     snake: VecDeque<GridCell>,
     food: GridCell,
     direction: Direction,
-    input: GameInput,
+    input: game_input::GameInput,
     output: GameOutput,
     min_width: u16,
     min_height: u16,
@@ -166,7 +145,7 @@ struct Game {
 
 impl Game {
     fn new(
-        input: GameInput,
+        input: game_input::GameInput,
         output: GameOutput,
         term_max_x: u16,
         term_max_y: u16,
@@ -298,13 +277,6 @@ impl Game {
         collision
     }
 
-    fn vertical(&self) -> bool {
-        match self.direction {
-            Direction::Up | Direction::Down => true,
-            Direction::Left | Direction::Right => false,
-        }
-    }
-
     fn play(&mut self) {
         // Initial render to clear screen
         self.output.clear_screen();
@@ -315,7 +287,7 @@ impl Game {
             // Handle user input
             match self.input.get_keypress() {
                 // Pause the game
-                KeyPress::P => loop {
+                KeyPress::Pause => loop {
                     // Sleep here to let input thread have some control
                     thread::sleep(Duration::from_millis(10));
                     match self.input.get_keypress() {
@@ -324,18 +296,18 @@ impl Game {
                     }
                 },
                 // Quit the game
-                KeyPress::Q => break 'mainloop,
+                KeyPress::Quit => break 'mainloop,
                 // Get pressed direction key
-                KeyPress::Direction(Direction::Up) if !self.vertical() => {
+                KeyPress::DirectionKey(Direction::Up) if !self.direction.vertical() => {
                     self.direction = Direction::Up;
                 }
-                KeyPress::Direction(Direction::Down) if !self.vertical() => {
+                KeyPress::DirectionKey(Direction::Down) if !self.direction.vertical() => {
                     self.direction = Direction::Down;
                 }
-                KeyPress::Direction(Direction::Left) if self.vertical() => {
+                KeyPress::DirectionKey(Direction::Left) if self.direction.vertical() => {
                     self.direction = Direction::Left;
                 }
-                KeyPress::Direction(Direction::Right) if self.vertical() => {
+                KeyPress::DirectionKey(Direction::Right) if self.direction.vertical() => {
                     self.direction = Direction::Right;
                 }
                 _ => (),
@@ -364,7 +336,7 @@ impl Game {
             self.output.draw_snake(&self.snake);
             self.output.draw_food(&self.food);
             self.output.render();
-            thread::sleep(Duration::from_millis(if self.vertical() {
+            thread::sleep(Duration::from_millis(if self.direction.vertical() {
                 self.speed + 20
             } else {
                 self.speed
@@ -379,6 +351,7 @@ impl Game {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = parser::ArgsParser::parse();
     let input = async_stdin().keys();
+    let input = game_input::GameInput::new(input, args.movement_key_scheme);
     let output = stdout().into_raw_mode()?.into_alternate_screen()?;
 
     let term_size = terminal_size()?;
@@ -386,7 +359,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let speed = args.speed.value();
 
     let mut game = Game::new(
-        GameInput { input },
+        input,
         GameOutput { output },
         term_size.0,
         term_size.1,
