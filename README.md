@@ -5,7 +5,7 @@
 
 ---
 
-# README
+# rs-snake
 
 ## Install ##
 
