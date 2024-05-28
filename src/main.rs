@@ -1,17 +1,18 @@
 use std::collections::{HashSet, VecDeque};
 use std::error::Error;
-use std::io::{stdout, Stdout, Write};
+use std::io::stdout;
 use std::{thread, time::Duration};
 
 use clap::Parser;
 use rand::Rng;
 use termion::input::TermRead;
-use termion::raw::{IntoRawMode, RawTerminal};
+use termion::raw::IntoRawMode;
 use termion::screen::IntoAlternateScreen;
-use termion::{async_stdin, clear, color, cursor, terminal_size};
+use termion::{async_stdin, terminal_size};
 
 use game_input::KeyPress;
 mod game_input;
+mod game_output;
 mod parser;
 
 #[derive(Debug, PartialEq)]
@@ -31,98 +32,6 @@ impl Direction {
     }
 }
 
-// TODO: still need to figure out how to abstract this part properly
-struct GameOutput {
-    output: termion::screen::AlternateScreen<RawTerminal<Stdout>>,
-}
-
-impl GameOutput {
-    fn render(&mut self) {
-        self.output.flush().unwrap();
-    }
-
-    fn clear_screen(&mut self) {
-        write!(self.output, "{}{}", clear::All, cursor::Hide).unwrap();
-    }
-
-    fn reset_terminal(&mut self) {
-        write!(
-            self.output,
-            "{}{}{}",
-            termion::cursor::Show,
-            termion::cursor::Goto(1, 1),
-            termion::clear::All
-        )
-        .unwrap();
-    }
-
-    fn draw_border(&mut self, xmin: u16, xmax: u16, ymin: u16, ymax: u16) {
-        for i in xmin - 1..=xmax + 1 {
-            for j in ymin - 1..=ymax + 1 {
-                match i {
-                    n if (n == xmin - 1 || n == xmax + 1) => write!(
-                        self.output,
-                        "{goto}{bgColor} ",
-                        goto = cursor::Goto(i, j),
-                        bgColor = color::Bg(color::White),
-                    )
-                    .unwrap(),
-                    _ => (),
-                };
-                match j {
-                    n if (n == ymin - 1 || n == ymax + 1) => write!(
-                        self.output,
-                        "{goto}{bgColor} ",
-                        goto = cursor::Goto(i, j),
-                        bgColor = color::Bg(color::White),
-                    )
-                    .unwrap(),
-                    _ => (),
-                };
-            }
-        }
-        write!(self.output, "{}", color::Bg(color::Reset),).unwrap()
-    }
-
-    fn draw_food(&mut self, food: &GridCell) {
-        write!(
-            self.output,
-            "{goto}{bgColor}{fgColor}{food_char}{fgreset}{bgreset}",
-            goto = cursor::Goto(food.x, food.y),
-            bgColor = color::Bg(color::Red),
-            fgColor = color::Fg(color::LightGreen),
-            food_char = '\u{00D3}',
-            fgreset = color::Fg(color::Reset),
-            bgreset = color::Bg(color::Reset),
-        )
-        .unwrap();
-    }
-
-    fn draw_snake(&mut self, snake: &VecDeque<GridCell>) {
-        let mut segments: usize = 0;
-        let len = snake.len();
-        for segment in snake {
-            let segment_char = match segments {
-                0 => 'S',
-                num if num == len - 1 => 'e',
-                1 => 'n',
-                num if num == len - 2 => 'k',
-                _ => 'a',
-            };
-            write!(
-                self.output,
-                "{goto}{bgColor}{segment_char}{reset}",
-                goto = cursor::Goto(segment.x, segment.y),
-                bgColor = color::Bg(color::Green),
-                segment_char = segment_char,
-                reset = color::Bg(color::Reset),
-            )
-            .unwrap();
-            segments += 1;
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct GridCell {
     x: u16,
@@ -135,7 +44,7 @@ struct Game {
     food: GridCell,
     direction: Direction,
     input: game_input::GameInput,
-    output: GameOutput,
+    output: game_output::GameOutput,
     min_width: u16,
     min_height: u16,
     max_width: u16,
@@ -146,7 +55,7 @@ struct Game {
 impl Game {
     fn new(
         input: game_input::GameInput,
-        output: GameOutput,
+        output: game_output::GameOutput,
         term_max_x: u16,
         term_max_y: u16,
         playable: f64,
@@ -360,7 +269,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut game = Game::new(
         input,
-        GameOutput { output },
+        game_output::GameOutput { output },
         term_size.0,
         term_size.1,
         playable,
