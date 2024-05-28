@@ -32,7 +32,7 @@ impl Direction {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 struct GridCell {
     x: u16,
     y: u16,
@@ -91,6 +91,7 @@ impl Game {
 
         // Generate food in a random cell
         let food = Game::generate_random_food(&grid);
+        grid.remove(&food);
 
         // Initialize starting movement direction
         let direction = Direction::Left;
@@ -117,7 +118,7 @@ impl Game {
         grid_list[random_index].clone()
     }
 
-    fn move_snake(&mut self) {
+    fn move_snake(&mut self) -> GridCell {
         // Get current head
         let head = self.snake.front().unwrap();
 
@@ -167,10 +168,8 @@ impl Game {
         // Push new head to start of snake
         self.snake.push_front(new_head);
 
-        // Remove old tail from snake
-        let old_tail = self.snake.pop_back().unwrap();
-        // Put old tail back into grid
-        self.grid.insert(old_tail);
+        // Return old tail from snake
+        self.snake.pop_back().unwrap()
     }
 
     fn check_collision(&mut self) -> bool {
@@ -187,10 +186,16 @@ impl Game {
     }
 
     fn play(&mut self) {
-        // Initial render to clear screen
+        // Initial render to clear screen and draw borders and food
         self.output.clear_screen();
+        self.output.draw_border(
+            self.min_width,
+            self.max_width,
+            self.min_height,
+            self.max_height,
+        );
+        self.output.draw_food(&self.food);
         self.output.render();
-
         // Start of main loop
         'mainloop: loop {
             // Handle user input
@@ -221,29 +226,32 @@ impl Game {
                 }
                 _ => (),
             }
-            self.move_snake();
+            // Handle snake movement
+            let old_tail = self.move_snake();
+
+            // Handle snake colliding with itself
             if self.check_collision() {
                 break 'mainloop;
             }
+            // Handle snake eating food
             if self.snake.front().unwrap() == &self.food {
                 for seg in &self.snake {
                     self.grid.remove(seg);
                 }
-                self.snake.push_back(self.snake.back().unwrap().clone());
+                // Add another segment to the snake by restoring his old tail segment
+                self.snake.push_back(old_tail);
+                // Undraw old food and restore cell to grid
+                // self.output.undraw(&self.food);
+                self.grid.insert(self.food);
+                // Generate new food, draw it and remove cell from grid
                 self.food = Game::generate_random_food(&self.grid);
+                self.output.draw_food(&self.food);
                 self.grid.remove(&self.food);
+            } else {
+                self.output.undraw(&old_tail);
+                self.grid.insert(old_tail);
             }
-
-            // Clear screen
-            self.output.clear_screen();
-            self.output.draw_border(
-                self.min_width,
-                self.max_width,
-                self.min_height,
-                self.max_height,
-            );
             self.output.draw_snake(&self.snake);
-            self.output.draw_food(&self.food);
             self.output.render();
             thread::sleep(Duration::from_millis(if self.direction.vertical() {
                 self.speed + 20
@@ -258,23 +266,21 @@ impl Game {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // Parse arguments from command line
     let args = parser::ArgsParser::parse();
+    // Initialize input handler
     let input = async_stdin().keys();
     let input = game_input::GameInput::new(input, args.movement_key_scheme);
+    // Initializt output handler
     let output = stdout().into_raw_mode()?.into_alternate_screen()?;
+    let output = game_output::GameOutput::new(output);
 
+    // Initialize rest of variables needed to initialize Game struct
     let term_size = terminal_size()?;
     let playable = args.grid_size.value();
     let speed = args.speed.value();
 
-    let mut game = Game::new(
-        input,
-        game_output::GameOutput { output },
-        term_size.0,
-        term_size.1,
-        playable,
-        speed,
-    );
+    let mut game = Game::new(input, output, term_size.0, term_size.1, playable, speed);
 
     game.play();
 

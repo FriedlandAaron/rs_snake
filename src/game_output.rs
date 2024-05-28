@@ -8,10 +8,13 @@ use crate::GridCell;
 
 // TODO: still need to figure out how to abstract this part properly
 pub struct GameOutput {
-    pub output: termion::screen::AlternateScreen<RawTerminal<Stdout>>,
+    output: termion::screen::AlternateScreen<RawTerminal<Stdout>>,
 }
 
 impl GameOutput {
+    pub fn new(output: termion::screen::AlternateScreen<RawTerminal<Stdout>>) -> Self {
+        Self { output }
+    }
     pub fn render(&mut self) {
         self.output.flush().unwrap();
     }
@@ -95,5 +98,9 @@ impl GameOutput {
             .unwrap();
             segments += 1;
         }
+    }
+
+    pub fn undraw(&mut self, cell: &GridCell) {
+        write!(self.output, "{} ", cursor::Goto(cell.x, cell.y)).unwrap();
     }
 }
