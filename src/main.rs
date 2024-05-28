@@ -22,6 +22,15 @@ enum Direction {
     Right,
 }
 
+impl Direction {
+    fn vertical(&self) -> bool {
+        match self {
+            Self::Up | Self::Down => true,
+            Self::Left | Self::Right => false,
+        }
+    }
+}
+
 // TODO: still need to figure out how to abstract this part properly
 struct GameOutput {
     output: termion::screen::AlternateScreen<RawTerminal<Stdout>>,
@@ -268,13 +277,6 @@ impl Game {
         collision
     }
 
-    fn vertical(&self) -> bool {
-        match self.direction {
-            Direction::Up | Direction::Down => true,
-            Direction::Left | Direction::Right => false,
-        }
-    }
-
     fn play(&mut self) {
         // Initial render to clear screen
         self.output.clear_screen();
@@ -296,16 +298,16 @@ impl Game {
                 // Quit the game
                 KeyPress::Q => break 'mainloop,
                 // Get pressed direction key
-                KeyPress::Direction(Direction::Up) if !self.vertical() => {
+                KeyPress::ArrowKey(Direction::Up) if !self.direction.vertical() => {
                     self.direction = Direction::Up;
                 }
-                KeyPress::Direction(Direction::Down) if !self.vertical() => {
+                KeyPress::ArrowKey(Direction::Down) if !self.direction.vertical() => {
                     self.direction = Direction::Down;
                 }
-                KeyPress::Direction(Direction::Left) if self.vertical() => {
+                KeyPress::ArrowKey(Direction::Left) if self.direction.vertical() => {
                     self.direction = Direction::Left;
                 }
-                KeyPress::Direction(Direction::Right) if self.vertical() => {
+                KeyPress::ArrowKey(Direction::Right) if self.direction.vertical() => {
                     self.direction = Direction::Right;
                 }
                 _ => (),
@@ -334,7 +336,7 @@ impl Game {
             self.output.draw_snake(&self.snake);
             self.output.draw_food(&self.food);
             self.output.render();
-            thread::sleep(Duration::from_millis(if self.vertical() {
+            thread::sleep(Duration::from_millis(if self.direction.vertical() {
                 self.speed + 20
             } else {
                 self.speed
@@ -349,6 +351,7 @@ impl Game {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = parser::ArgsParser::parse();
     let input = async_stdin().keys();
+    let input = game_input::GameInput::new(input);
     let output = stdout().into_raw_mode()?.into_alternate_screen()?;
 
     let term_size = terminal_size()?;
@@ -356,7 +359,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let speed = args.speed.value();
 
     let mut game = Game::new(
-        game_input::GameInput { input },
+        input,
         GameOutput { output },
         term_size.0,
         term_size.1,
