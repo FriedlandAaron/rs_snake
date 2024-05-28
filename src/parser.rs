@@ -7,6 +7,8 @@ pub struct ArgsParser {
     pub grid_size: GridSize,
     #[arg(short, long, value_enum, default_value_t = Speed::High)]
     pub speed: Speed,
+    #[arg(short, long, value_enum, default_value_t = MovementKeyScheme::Arrows)]
+    pub movement_key_scheme: MovementKeyScheme,
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -41,4 +43,10 @@ impl Speed {
             Speed::High => 60,
         }
     }
+}
+
+#[derive(ValueEnum, Clone, Debug, PartialEq)]
+pub enum MovementKeyScheme {
+    WSAD,
+    Arrows,
 }

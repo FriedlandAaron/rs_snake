@@ -287,7 +287,7 @@ impl Game {
             // Handle user input
             match self.input.get_keypress() {
                 // Pause the game
-                KeyPress::P => loop {
+                KeyPress::Pause => loop {
                     // Sleep here to let input thread have some control
                     thread::sleep(Duration::from_millis(10));
                     match self.input.get_keypress() {
@@ -296,18 +296,18 @@ impl Game {
                     }
                 },
                 // Quit the game
-                KeyPress::Q => break 'mainloop,
+                KeyPress::Quit => break 'mainloop,
                 // Get pressed direction key
-                KeyPress::ArrowKey(Direction::Up) if !self.direction.vertical() => {
+                KeyPress::DirectionKey(Direction::Up) if !self.direction.vertical() => {
                     self.direction = Direction::Up;
                 }
-                KeyPress::ArrowKey(Direction::Down) if !self.direction.vertical() => {
+                KeyPress::DirectionKey(Direction::Down) if !self.direction.vertical() => {
                     self.direction = Direction::Down;
                 }
-                KeyPress::ArrowKey(Direction::Left) if self.direction.vertical() => {
+                KeyPress::DirectionKey(Direction::Left) if self.direction.vertical() => {
                     self.direction = Direction::Left;
                 }
-                KeyPress::ArrowKey(Direction::Right) if self.direction.vertical() => {
+                KeyPress::DirectionKey(Direction::Right) if self.direction.vertical() => {
                     self.direction = Direction::Right;
                 }
                 _ => (),
@@ -351,7 +351,7 @@ impl Game {
 fn main() -> Result<(), Box<dyn Error>> {
     let args = parser::ArgsParser::parse();
     let input = async_stdin().keys();
-    let input = game_input::GameInput::new(input);
+    let input = game_input::GameInput::new(input, args.movement_key_scheme);
     let output = stdout().into_raw_mode()?.into_alternate_screen()?;
 
     let term_size = terminal_size()?;
