@@ -4,7 +4,7 @@ use std::io::{Stdout, Write};
 use termion::raw::RawTerminal;
 use termion::{clear, color, cursor};
 
-use crate::GridCell;
+use crate::game::GridCell;
 
 // TODO: still need to figure out how to abstract this part properly
 pub struct GameOutput {
