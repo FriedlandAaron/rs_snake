@@ -1,9 +1,12 @@
 use rand::Rng;
 use std::collections::{HashSet, VecDeque};
+use std::hash::Hash;
 use std::{thread, time::Duration};
 
 use crate::game_input::{self, KeyPress};
 use crate::game_output;
+
+const INIT_SNAKE_SIZE: u16 = 5;
 
 #[derive(Debug, PartialEq)]
 enum GameState {
@@ -66,22 +69,10 @@ impl Game {
         let max_height = ((term_max_y - 1) as f64 * playable) as u16;
 
         // Initialize game grid
-        let mut grid = HashSet::new();
-        for i in min_width..=max_width {
-            for j in min_height..=max_height {
-                grid.insert(GridCell { x: i, y: j });
-            }
-        }
+        let mut grid = Self::create_grid(min_width, min_height, max_width, max_height);
 
         // Initialize snake
-        let mut snake = VecDeque::new();
-        let init_size = 5;
-        for i in 1..=init_size {
-            snake.push_front(GridCell {
-                x: max_width - i,
-                y: (max_height + min_height) / 2,
-            });
-        }
+        let snake = Self::create_snake(min_height, max_width, max_height);
 
         // Update grid by removing cells occupied by snake
         for seg in &snake {
@@ -116,7 +107,12 @@ impl Game {
             match self.state {
                 // TODO: handle pregame
                 GameState::PreGame => self.state = GameState::InProgress,
-                GameState::InProgress => self.play(),
+                GameState::InProgress => {
+                    let quit = self.play();
+                    if quit {
+                        break;
+                    }
+                }
                 GameState::GameOver => {
                     let keep_playing = self.game_over();
                     if keep_playing {
@@ -132,26 +128,40 @@ impl Game {
         self.output.reset_terminal();
     }
 
+    fn create_grid(min_w: u16, min_h: u16, max_w: u16, max_h: u16) -> HashSet<GridCell> {
+        let mut grid = HashSet::new();
+        for i in min_w..=max_w {
+            for j in min_h..=max_h {
+                grid.insert(GridCell { x: i, y: j });
+            }
+        }
+        grid
+    }
+
+    fn create_snake(min_h: u16, max_w: u16, max_h: u16) -> VecDeque<GridCell> {
+        let mut snake = VecDeque::new();
+        for i in 1..=INIT_SNAKE_SIZE {
+            snake.push_front(GridCell {
+                x: max_w - i,
+                y: (max_h + min_h) / 2,
+            });
+        }
+        snake
+    }
+
     fn restart(&mut self) {
         self.state = GameState::InProgress;
 
         // Initialize game grid
-        self.grid = HashSet::new();
-        for i in self.min_width..=self.max_width {
-            for j in self.min_height..=self.max_height {
-                self.grid.insert(GridCell { x: i, y: j });
-            }
-        }
+        self.grid = Self::create_grid(
+            self.min_width,
+            self.min_height,
+            self.max_width,
+            self.max_height,
+        );
 
         // Initialize snake
-        self.snake = VecDeque::new();
-        let init_size = 5;
-        for i in 1..=init_size {
-            self.snake.push_front(GridCell {
-                x: self.max_width - i,
-                y: (self.max_height + self.min_height) / 2,
-            });
-        }
+        self.snake = Self::create_snake(self.min_height, self.max_width, self.max_height);
 
         // Update grid by removing cells occupied by snake
         for seg in &self.snake {
@@ -264,7 +274,7 @@ impl Game {
         keep_playing
     }
 
-    fn play(&mut self) {
+    fn play(&mut self) -> bool {
         // Initial render to clear screen and draw borders and food
         self.output.clear_screen();
         self.output.draw_border(
@@ -281,15 +291,15 @@ impl Game {
             match self.input.get_keypress() {
                 // Pause the game
                 KeyPress::Pause => loop {
-                    // Sleep here to let input thread have some control
-                    thread::sleep(Duration::from_millis(10));
                     match self.input.get_keypress() {
                         KeyPress::None | KeyPress::Other => (),
                         _ => break,
                     }
+                    // Sleep here to let input thread have some control
+                    thread::sleep(Duration::from_millis(10));
                 },
                 // Quit the game
-                KeyPress::Quit => break 'mainloop,
+                KeyPress::Quit => return true,
                 // Get pressed direction key
                 KeyPress::DirectionKey(Direction::Up) if !self.direction.vertical() => {
                     self.direction = Direction::Up;
@@ -338,5 +348,6 @@ impl Game {
                 self.speed
             }));
         }
+        false
     }
 }
