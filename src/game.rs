@@ -6,6 +6,13 @@ use crate::game_input::{self, KeyPress};
 use crate::game_output;
 
 #[derive(Debug, PartialEq)]
+enum GameState {
+    PreGame,
+    InProgress,
+    GameOver,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Direction {
     Up,
     Down,
@@ -29,6 +36,7 @@ pub struct GridCell {
 }
 
 pub struct Game {
+    state: GameState,
     grid: HashSet<GridCell>,
     snake: VecDeque<GridCell>,
     food: GridCell,
@@ -51,6 +59,7 @@ impl Game {
         playable: f64,
         speed: u64,
     ) -> Game {
+        let state = GameState::InProgress;
         let min_width = (2.0 + ((term_max_x - 1) as f64 * (1.0 - playable))) as u16;
         let min_height = (2.0 + ((term_max_y - 1) as f64 * (1.0 - playable))) as u16;
         let max_width = ((term_max_x - 1) as f64 * playable) as u16;
@@ -87,6 +96,7 @@ impl Game {
         let direction = Direction::Left;
 
         Game {
+            state,
             grid,
             snake,
             food,
@@ -99,6 +109,40 @@ impl Game {
             max_height,
             speed,
         }
+    }
+
+    fn restart(&mut self) {
+        self.state = GameState::InProgress;
+
+        // Initialize game grid
+        self.grid = HashSet::new();
+        for i in self.min_width..=self.max_width {
+            for j in self.min_height..=self.max_height {
+                self.grid.insert(GridCell { x: i, y: j });
+            }
+        }
+
+        // Initialize snake
+        self.snake = VecDeque::new();
+        let init_size = 5;
+        for i in 1..=init_size {
+            self.snake.push_front(GridCell {
+                x: self.max_width - i,
+                y: (self.max_height + self.min_height) / 2,
+            });
+        }
+
+        // Update grid by removing cells occupied by snake
+        for seg in &self.snake {
+            self.grid.remove(seg);
+        }
+
+        // Generate food in a random cell
+        self.food = Game::generate_random_food(&self.grid);
+        self.grid.remove(&self.food);
+
+        // Initialize starting movement direction
+        self.direction = Direction::Left;
     }
 
     fn generate_random_food(grid: &HashSet<GridCell>) -> GridCell {
@@ -175,7 +219,35 @@ impl Game {
         collision
     }
 
-    pub fn play(&mut self) {
+    fn game_over(&mut self) -> bool {
+        let mut keep_playing = false;
+        // Reset terminal
+        self.output.clear_screen();
+
+        // Render game over screen
+        self.output.draw_game_over_message();
+        self.output.render();
+
+        // Handle input
+        loop {
+            match self.input.get_keypress() {
+                KeyPress::Pause => {
+                    self.restart();
+                    keep_playing = true;
+                    break;
+                }
+                KeyPress::Quit => break,
+                _ => (),
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        keep_playing
+    }
+
+    pub fn play(&mut self) -> bool {
+        let mut keep_playing = false;
+        // Change game state
+        self.state = GameState::InProgress;
         // Initial render to clear screen and draw borders and food
         self.output.clear_screen();
         self.output.draw_border(
@@ -221,6 +293,7 @@ impl Game {
 
             // Handle snake colliding with itself
             if self.check_collision() {
+                self.state = GameState::GameOver;
                 break 'mainloop;
             }
             // Handle snake eating food
@@ -250,7 +323,13 @@ impl Game {
             }));
         }
 
+        if self.state == GameState::GameOver {
+            keep_playing = self.game_over();
+        }
+
         // Reset terminal
         self.output.reset_terminal();
+
+        keep_playing
     }
 }

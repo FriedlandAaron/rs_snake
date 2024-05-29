@@ -34,6 +34,13 @@ impl GameOutput {
         .unwrap();
     }
 
+    pub fn draw_game_over_message(&mut self) {
+        let message = format!(
+            "Game over! Would you like to play again?\r\nPress 'p' to play again, press 'q' to quit"
+        );
+        write!(self.output, "{}{}", termion::cursor::Goto(1, 1), message).unwrap();
+    }
+
     pub fn draw_border(&mut self, xmin: u16, xmax: u16, ymin: u16, ymax: u16) {
         for i in xmin - 1..=xmax + 1 {
             for j in ymin - 1..=ymax + 1 {

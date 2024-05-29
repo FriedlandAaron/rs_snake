@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Initialize input handler
     let input = async_stdin().keys();
     let input = game_input::GameInput::new(input, args.movement_key_scheme);
-    // Initializt output handler
+    // Initialize output handler
     let output = stdout().into_raw_mode()?.into_alternate_screen()?;
     let output = game_output::GameOutput::new(output);
 
@@ -29,7 +29,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut game = game::Game::new(input, output, term_size.0, term_size.1, playable, speed);
 
-    game.play();
+    loop {
+        match game.play() {
+            true => continue,
+            false => break,
+        }
+    }
 
     Ok(())
 }
