@@ -34,9 +34,9 @@ impl GameOutput {
         .unwrap();
     }
 
-    pub fn draw_game_over_message(&mut self) {
+    pub fn draw_game_over_message(&mut self, len: usize) {
         let message = format!(
-            "Game over! Would you like to play again?\r\nPress 'p' to play again, press 'q' to quit"
+            "Game over! You reached a snake length of {len}! Would you like to play again?\r\nPress 'p' to play again, press 'q' to quit"
         );
         write!(self.output, "{}{}", termion::cursor::Goto(1, 1), message).unwrap();
     }

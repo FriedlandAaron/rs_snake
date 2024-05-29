@@ -256,7 +256,7 @@ impl Game {
         self.output.clear_screen();
 
         // Render game over screen
-        self.output.draw_game_over_message();
+        self.output.draw_game_over_message(self.snake.len());
         self.output.render();
 
         // Handle input
