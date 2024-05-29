@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use termion::event::Key;
 use termion::AsyncReader;
 
+use crate::game::Direction;
 use crate::parser::MovementKeyScheme;
-use crate::Direction;
 
 #[derive(Debug, PartialEq)]
 pub enum KeyPress {

@@ -4,7 +4,7 @@ use std::io::{Stdout, Write};
 use termion::raw::RawTerminal;
 use termion::{clear, color, cursor};
 
-use crate::GridCell;
+use crate::game::GridCell;
 
 // TODO: still need to figure out how to abstract this part properly
 pub struct GameOutput {
@@ -32,6 +32,13 @@ impl GameOutput {
             termion::clear::All
         )
         .unwrap();
+    }
+
+    pub fn draw_game_over_message(&mut self, len: usize) {
+        let message = format!(
+            "Game over! You reached a snake length of {len}! Would you like to play again?\r\nPress 'p' to play again, press 'q' to quit"
+        );
+        write!(self.output, "{}{}", termion::cursor::Goto(1, 1), message).unwrap();
     }
 
     pub fn draw_border(&mut self, xmin: u16, xmax: u16, ymin: u16, ymax: u16) {
