@@ -1,6 +1,6 @@
 [package]
 name = "rs_snake"
-version = "1.0.3"
+version = "1.0.4"
 edition = "2021"
 description = "The classic 'Snake' game as a terminal application."
 license = "Unlicense"
