@@ -29,12 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut game = game::Game::new(input, output, term_size.0, term_size.1, playable, speed);
 
-    loop {
-        match game.play() {
-            true => continue,
-            false => break,
-        }
-    }
+    game.start();
 
     Ok(())
 }

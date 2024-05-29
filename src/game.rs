@@ -111,6 +111,15 @@ impl Game {
         }
     }
 
+    pub fn start(&mut self) {
+        loop {
+            match self.play() {
+                true => continue,
+                false => break,
+            }
+        }
+    }
+
     fn restart(&mut self) {
         self.state = GameState::InProgress;
 
@@ -244,7 +253,7 @@ impl Game {
         keep_playing
     }
 
-    pub fn play(&mut self) -> bool {
+    fn play(&mut self) -> bool {
         let mut keep_playing = false;
         // Change game state
         self.state = GameState::InProgress;
