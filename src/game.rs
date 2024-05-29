@@ -59,7 +59,7 @@ impl Game {
         playable: f64,
         speed: u64,
     ) -> Game {
-        let state = GameState::InProgress;
+        let state = GameState::PreGame;
         let min_width = (2.0 + ((term_max_x - 1) as f64 * (1.0 - playable))) as u16;
         let min_height = (2.0 + ((term_max_y - 1) as f64 * (1.0 - playable))) as u16;
         let max_width = ((term_max_x - 1) as f64 * playable) as u16;
@@ -111,13 +111,25 @@ impl Game {
         }
     }
 
-    pub fn start(&mut self) {
+    pub fn run(&mut self) {
         loop {
-            match self.play() {
-                true => continue,
-                false => break,
+            match self.state {
+                // TODO: handle pregame
+                GameState::PreGame => self.state = GameState::InProgress,
+                GameState::InProgress => self.play(),
+                GameState::GameOver => {
+                    let keep_playing = self.game_over();
+                    if keep_playing {
+                        self.restart();
+                    } else {
+                        break;
+                    }
+                }
             }
         }
+
+        // Reset terminal
+        self.output.reset_terminal();
     }
 
     fn restart(&mut self) {
@@ -230,7 +242,7 @@ impl Game {
 
     fn game_over(&mut self) -> bool {
         let mut keep_playing = false;
-        // Reset terminal
+        // Clear terminal
         self.output.clear_screen();
 
         // Render game over screen
@@ -241,7 +253,6 @@ impl Game {
         loop {
             match self.input.get_keypress() {
                 KeyPress::Pause => {
-                    self.restart();
                     keep_playing = true;
                     break;
                 }
@@ -253,10 +264,7 @@ impl Game {
         keep_playing
     }
 
-    fn play(&mut self) -> bool {
-        let mut keep_playing = false;
-        // Change game state
-        self.state = GameState::InProgress;
+    fn play(&mut self) {
         // Initial render to clear screen and draw borders and food
         self.output.clear_screen();
         self.output.draw_border(
@@ -313,7 +321,6 @@ impl Game {
                 // Add another segment to the snake by restoring his old tail segment
                 self.snake.push_back(old_tail);
                 // Undraw old food and restore cell to grid
-                // self.output.undraw(&self.food);
                 self.grid.insert(self.food);
                 // Generate new food, draw it and remove cell from grid
                 self.food = Game::generate_random_food(&self.grid);
@@ -331,14 +338,5 @@ impl Game {
                 self.speed
             }));
         }
-
-        if self.state == GameState::GameOver {
-            keep_playing = self.game_over();
-        }
-
-        // Reset terminal
-        self.output.reset_terminal();
-
-        keep_playing
     }
 }
