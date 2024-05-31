@@ -36,6 +36,6 @@ jobs:
           tool: cargo-release
 
       - name: Run cargo-release to update repo and crates.io
-        run: cargo release --no-verify --execute ${{ inputs.version_level }}
+        run: cargo release --no-verify --no-confirm --execute ${{ inputs.version_level }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
