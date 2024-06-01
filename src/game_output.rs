@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::io::{Stdout, Write};
 
+use cfonts::{Align, Colors, Fonts, Options};
 use termion::raw::RawTerminal;
 use termion::{clear, color, cursor};
 
@@ -34,11 +35,42 @@ impl GameOutput {
         .unwrap();
     }
 
+    pub fn draw_game_over_transition_msg(&mut self, min_y: u16, max_y: u16) {
+        let msg = cfonts::render(Options {
+            text: String::from("game|over!"),
+            font: Fonts::FontBlock,
+            align: Align::Center,
+            line_height: 0,
+            colors: vec![Colors::RedBright],
+            spaceless: true,
+            ..Options::default()
+        });
+        let msg = msg.text.replace("\n", "\r\n");
+        let font_block_spacing = 5;
+        let height = ((min_y + max_y) / 2) - font_block_spacing;
+        write!(self.output, "{}{}", termion::cursor::Goto(1, height), msg).unwrap();
+    }
+
     pub fn draw_game_over_message(&mut self, len: usize) {
-        let message = format!(
-            "Game over! You reached a snake length of {len}! Would you like to play again?\r\nPress 'p' to play again, press 'q' to quit"
+        let msg = cfonts::render(Options {
+            text: String::from("game|over!"),
+            font: Fonts::FontHuge,
+            align: Align::Center,
+            ..Options::default()
+        });
+        let msg = msg.text.replace("\n", "\r\n");
+        let prompt = format!(
+            "You reached a snake length of {len}! Would you like to play again?|Press 'p' to play again, press 'q' to quit."
         );
-        write!(self.output, "{}{}", termion::cursor::Goto(1, 1), message).unwrap();
+        let msg2 = cfonts::render(Options {
+            text: prompt,
+            font: Fonts::FontConsole,
+            align: Align::Center,
+            ..Options::default()
+        });
+        let msg2 = msg2.text.replace("\n", "\r\n").to_uppercase();
+        write!(self.output, "{}", termion::cursor::Goto(1, 1)).unwrap();
+        write!(self.output, "{}{}", msg, msg2).unwrap();
     }
 
     pub fn draw_border(&mut self, xmin: u16, xmax: u16, ymin: u16, ymax: u16) {

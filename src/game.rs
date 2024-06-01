@@ -114,6 +114,7 @@ impl Game {
                     }
                 }
                 GameState::GameOver => {
+                    self.game_over_transition();
                     let keep_playing = self.game_over();
                     if keep_playing {
                         self.restart();
@@ -248,6 +249,38 @@ impl Game {
             }
         }
         collision
+    }
+
+    fn draw_all(&mut self) {
+        self.output.draw_border(
+            self.min_width,
+            self.max_width,
+            self.min_height,
+            self.max_height,
+        );
+        self.output.draw_snake(&self.snake);
+        self.output.draw_food(&self.food);
+    }
+
+    fn game_over_transition(&mut self) {
+        let transition_time = 500;
+        let num_changes = 3;
+        for _ in 1..=num_changes {
+            self.output
+                .draw_game_over_transition_msg(self.min_height, self.max_height);
+            self.output.draw_border(
+                self.min_width,
+                self.max_width,
+                self.min_height,
+                self.max_height,
+            );
+            self.output.render();
+            thread::sleep(Duration::from_millis(transition_time));
+            self.output.clear_screen();
+            self.draw_all();
+            self.output.render();
+            thread::sleep(Duration::from_millis(transition_time));
+        }
     }
 
     fn game_over(&mut self) -> bool {
