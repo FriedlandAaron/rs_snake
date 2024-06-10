@@ -11,7 +11,7 @@ pub struct ArgsParser {
     pub movement_key_scheme: MovementKeyScheme,
 }
 
-#[derive(ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Copy, Debug)]
 pub enum GridSize {
     Small,
     Medium,
@@ -28,7 +28,7 @@ impl GridSize {
     }
 }
 
-#[derive(ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Copy, Debug)]
 pub enum Speed {
     Slow,
     Moderate,
@@ -45,8 +45,8 @@ impl Speed {
     }
 }
 
-#[derive(ValueEnum, Clone, Debug, PartialEq)]
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
 pub enum MovementKeyScheme {
-    WSAD,
+    Wsad,
     Arrows,
 }
