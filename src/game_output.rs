@@ -75,6 +75,27 @@ impl GameOutput {
         write!(self.output, "{}{}{}", msg, msg2, color::Bg(color::Reset),).unwrap();
     }
 
+    pub fn draw_welcome_message(&mut self) {
+        let msg1 = cfonts::render(Options {
+            text: String::from("welcome to"),
+            font: Fonts::FontBlock,
+            align: Align::Center,
+            colors: vec![Colors::Yellow, Colors::Candy],
+            ..Options::default()
+        });
+        let msg1 = msg1.text.replace('\n', "\r\n");
+        let msg2 = cfonts::render(Options {
+            text: String::from("snake"),
+            font: Fonts::Font3d,
+            align: Align::Center,
+            colors: vec![Colors::Green, Colors::Gray],
+            ..Options::default()
+        });
+        let msg2 = msg2.text.replace('\n', "\r\n");
+        write!(self.output, "{}", termion::cursor::Goto(1, 1)).unwrap();
+        write!(self.output, "{}{}", msg1, msg2).unwrap();
+    }
+
     pub fn draw_border(&mut self, xmin: u16, xmax: u16, ymin: u16, ymax: u16) {
         for i in xmin - 1..=xmax + 1 {
             for j in ymin - 1..=ymax + 1 {

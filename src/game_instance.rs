@@ -128,6 +128,32 @@ impl GameInstance {
         }
     }
 
+    pub fn new_welcome(terminal_size: &TerminalSize) -> Self {
+        // Initialize grid
+        let grid = GameGrid::new(terminal_size, 1.0);
+        // Initialize snake
+        let mut snake = Snake::new(&grid);
+        let (_, _, x_max, y_max) = grid.get_corners();
+        snake.body.clear();
+        for i in 1..=INIT_SNAKE_SIZE {
+            snake.body.push_front(GridCell {
+                x: x_max - i,
+                y: (y_max + (y_max / 2)) / 2,
+            });
+        }
+        snake.old_tail = None;
+        // Generate food in a random cell
+        let food = Self::generate_random_food(&grid.cells, &snake);
+        // Initialize starting movement direction
+        let direction = Direction::Left;
+        Self {
+            grid,
+            snake,
+            food,
+            direction,
+        }
+    }
+
     // return false if game over, else true
     pub fn game_cycle(&mut self) -> bool {
         // Handle snake movement

@@ -11,6 +11,23 @@ struct Options {
     movement_key_scheme: MovementKeyScheme,
 }
 
+impl Options {
+    fn new(args: ArgsParser) -> Self {
+        Self {
+            grid_size: args.grid_size,
+            speed: args.speed,
+            movement_key_scheme: args.movement_key_scheme,
+        }
+    }
+    fn get_welcome_options() -> Self {
+        Self {
+            grid_size: GridSize::Large,
+            speed: Speed::High,
+            movement_key_scheme: MovementKeyScheme::Arrows,
+        }
+    }
+}
+
 pub struct TerminalSize {
     xy: (u16, u16),
 }
@@ -52,12 +69,8 @@ impl Game {
     ) -> Game {
         let terminal_size = TerminalSize::new(terminal_size);
         let state = GameState::PreGame;
-        let instance = GameInstance::new(&terminal_size, args.grid_size.value());
-        let options = Options {
-            grid_size: args.grid_size,
-            speed: args.speed,
-            movement_key_scheme: args.movement_key_scheme,
-        };
+        let options = Options::new(args);
+        let instance = GameInstance::new(&terminal_size, options.grid_size.value());
         Game {
             options,
             state,
@@ -72,18 +85,26 @@ impl Game {
         loop {
             match self.state {
                 // TODO: handle pregame
-                GameState::PreGame => self.state = GameState::InProgress,
+                GameState::PreGame => {
+                    let play = self.welcome();
+                    if !play {
+                        break;
+                    }
+                    self.state = GameState::InProgress;
+                }
                 GameState::InProgress => {
                     let quit = self.play();
                     if quit {
                         break;
                     }
+                    self.state = GameState::GameOver;
                 }
                 GameState::GameOver => {
                     self.game_over_transition();
                     let keep_playing = self.game_over();
                     if keep_playing {
                         self.restart();
+                        self.state = GameState::InProgress;
                     } else {
                         break;
                     }
@@ -95,7 +116,37 @@ impl Game {
         self.output.reset_terminal();
     }
 
+    fn welcome(&mut self) -> bool {
+        let mut play = true;
+        self.instance = GameInstance::new_welcome(&self.terminal_size);
+        self.output.clear_screen();
+        self.output.draw_welcome_message();
+        self.output.draw_snake(&self.instance.snake);
+        // self.output.draw_food(&self.instance.food);
+        self.output.render();
+        loop {
+            match self.input.get_keypress() {
+                // Start playing the game
+                KeyPress::Pause => break,
+                // Quit the game
+                KeyPress::Quit => {
+                    play = false;
+                    break;
+                }
+                _ => (),
+            }
+            self.instance.game_cycle();
+            self.output.draw_snake(&self.instance.snake);
+            self.output.render();
+
+            // Sleep here to let input thread have some control
+            thread::sleep(Duration::from_millis(self.options.speed.value()));
+        }
+        play
+    }
+
     fn play(&mut self) -> bool {
+        self.instance = GameInstance::new(&self.terminal_size, self.options.grid_size.value());
         // Initial render
         self.output.clear_screen();
         self.draw_border();
@@ -108,14 +159,11 @@ impl Game {
             // Handle user input
             match self.input.get_keypress() {
                 // Pause the game
-                KeyPress::Pause => loop {
-                    match self.input.get_keypress() {
-                        KeyPress::None | KeyPress::Other => (),
-                        _ => break,
+                KeyPress::Pause => {
+                    while let KeyPress::None | KeyPress::Other = self.input.get_keypress() {
+                        thread::sleep(Duration::from_millis(10));
                     }
-                    // Sleep here to let input thread have some control
-                    thread::sleep(Duration::from_millis(10));
-                },
+                }
                 // Quit the game
                 KeyPress::Quit => return true,
                 // Get pressed direction key
@@ -137,7 +185,6 @@ impl Game {
             let proceed = self.instance.game_cycle();
 
             if !proceed {
-                self.state = GameState::GameOver;
                 break 'mainloop;
             }
             self.output.draw_snake(&self.instance.snake);
@@ -181,7 +228,6 @@ impl Game {
     }
 
     fn restart(&mut self) {
-        self.state = GameState::InProgress;
         self.instance = GameInstance::new(&self.terminal_size, self.options.grid_size.value());
     }
 
