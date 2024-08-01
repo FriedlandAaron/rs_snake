@@ -26,6 +26,10 @@ impl GameOutput {
         write!(self.output, "{}{}", clear::All, cursor::Hide).unwrap();
     }
 
+    pub fn show_cursor(&mut self) {
+        write!(self.output, "{}{}", cursor::Goto(1, 1), cursor::Show).unwrap();
+    }
+
     pub fn draw_game_over_transition_msg(&mut self, min_y: u16, max_y: u16) {
         let msg = cfonts::render(Options {
             text: String::from("game|over!"),
@@ -81,8 +85,16 @@ impl GameOutput {
             ..Options::default()
         });
         let msg2 = msg2.text.replace('\n', "\r\n");
+        let prompt = "|||Press 'p' to play, press 'q' to quit.".to_string();
+        let msg3 = cfonts::render(Options {
+            text: prompt,
+            font: Fonts::FontConsole,
+            align: Align::Center,
+            ..Options::default()
+        });
+        let msg3 = msg3.text.replace('\n', "\r\n").to_uppercase();
         write!(self.output, "{}", termion::cursor::Goto(1, 1)).unwrap();
-        write!(self.output, "{}{}", msg1, msg2).unwrap();
+        write!(self.output, "{}{}{}", msg1, msg2, msg3).unwrap();
     }
 
     pub fn draw_border(&mut self, xmin: u16, xmax: u16, ymin: u16, ymax: u16) {

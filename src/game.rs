@@ -107,6 +107,7 @@ impl Game {
                 }
             }
         }
+        self.output.show_cursor();
     }
 
     fn pre_game(&mut self) -> GameState {
