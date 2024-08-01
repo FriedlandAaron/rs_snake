@@ -50,6 +50,8 @@ enum GameState {
     InProgress,
     GameOver,
     QuitButtonPressed,
+    RestartGame,
+    GameOverTransition,
 }
 
 pub struct Game {
@@ -82,66 +84,44 @@ impl Game {
         }
     }
 
-    // state -> function for state
     // return value = new state? or middleman function interprets return value and gives new state?
     pub fn run(&mut self) {
         loop {
             match self.state {
-                // TODO: handle pregame
                 GameState::PreGame => {
-                    let play = self.welcome();
-                    if !play {
-                        self.state = GameState::QuitButtonPressed;
-                        continue;
-                    }
-                    self.state = GameState::InProgress;
+                    self.state = self.pre_game();
                 }
                 GameState::InProgress => {
-                    let quit = self.play();
-                    if quit {
-                        self.state = GameState::QuitButtonPressed;
-                        continue;
-                    }
-                    self.state = GameState::GameOver;
+                    self.state = self.in_progress_game();
+                }
+                GameState::GameOverTransition => {
+                    self.state = self.game_over_transition();
                 }
                 GameState::GameOver => {
-                    self.game_over_transition();
-                    let keep_playing = self.game_over();
-                    if keep_playing {
-                        self.restart();
-                        self.state = GameState::InProgress;
-                    } else {
-                        self.state = GameState::QuitButtonPressed;
-                        continue;
-                    }
+                    self.state = self.game_over();
+                }
+                GameState::RestartGame => {
+                    self.state = self.restart_game();
                 }
                 GameState::QuitButtonPressed => {
                     break;
                 }
             }
         }
-
-        // Reset terminal
-        self.output.reset_terminal();
     }
 
-    fn welcome(&mut self) -> bool {
-        let mut play = true;
-        self.instance = GameInstance::new_welcome(&self.terminal_size);
+    fn pre_game(&mut self) -> GameState {
+        self.instance = GameInstance::new_pre_game(&self.terminal_size);
         self.output.clear_screen();
-        self.output.draw_welcome_message();
+        self.output.draw_pre_game_message();
         self.output.draw_snake(&self.instance.snake);
-        // self.output.draw_food(&self.instance.food);
         self.output.render();
         loop {
             match self.input.get_keypress() {
                 // Start playing the game
                 KeyPress::Pause => break,
                 // Quit the game
-                KeyPress::Quit => {
-                    play = false;
-                    break;
-                }
+                KeyPress::Quit => return GameState::QuitButtonPressed,
                 _ => (),
             }
             self.instance.game_cycle();
@@ -151,10 +131,10 @@ impl Game {
             // Sleep here to let input thread have some control
             thread::sleep(Duration::from_millis(self.options.speed.value()));
         }
-        play
+        GameState::InProgress
     }
 
-    fn play(&mut self) -> bool {
+    fn in_progress_game(&mut self) -> GameState {
         self.instance = GameInstance::new(&self.terminal_size, self.options.grid_size.value());
         // Initial render
         self.output.clear_screen();
@@ -174,7 +154,7 @@ impl Game {
                     }
                 }
                 // Quit the game
-                KeyPress::Quit => return true,
+                KeyPress::Quit => return GameState::QuitButtonPressed,
                 // Get pressed direction key
                 KeyPress::DirectionKey(Direction::Up) if !self.instance.direction.vertical() => {
                     self.instance.direction = Direction::Up;
@@ -207,11 +187,10 @@ impl Game {
                 },
             ));
         }
-        false
+        GameState::GameOverTransition
     }
 
-    fn game_over(&mut self) -> bool {
-        let mut keep_playing = false;
+    fn game_over(&mut self) -> GameState {
         // Clear terminal
         self.output.clear_screen();
 
@@ -224,23 +203,20 @@ impl Game {
         self.input.empty_key_buffer();
         loop {
             match self.input.get_keypress() {
-                KeyPress::Pause => {
-                    keep_playing = true;
-                    break;
-                }
-                KeyPress::Quit => break,
+                KeyPress::Pause => return GameState::RestartGame,
+                KeyPress::Quit => return GameState::QuitButtonPressed,
                 _ => (),
             }
             thread::sleep(Duration::from_millis(10));
         }
-        keep_playing
     }
 
-    fn restart(&mut self) {
+    fn restart_game(&mut self) -> GameState {
         self.instance = GameInstance::new(&self.terminal_size, self.options.grid_size.value());
+        GameState::InProgress
     }
 
-    fn game_over_transition(&mut self) {
+    fn game_over_transition(&mut self) -> GameState {
         let transition_time = 500;
         let num_changes = 3;
         for _ in 1..=num_changes {
@@ -254,6 +230,7 @@ impl Game {
             self.output.render();
             thread::sleep(Duration::from_millis(transition_time));
         }
+        GameState::GameOver
     }
 
     fn draw_border(&mut self) {

@@ -26,17 +26,6 @@ impl GameOutput {
         write!(self.output, "{}{}", clear::All, cursor::Hide).unwrap();
     }
 
-    pub fn reset_terminal(&mut self) {
-        write!(
-            self.output,
-            "{}{}{}",
-            termion::cursor::Show,
-            termion::cursor::Goto(1, 1),
-            termion::clear::All
-        )
-        .unwrap();
-    }
-
     pub fn draw_game_over_transition_msg(&mut self, min_y: u16, max_y: u16) {
         let msg = cfonts::render(Options {
             text: String::from("game|over!"),
@@ -75,7 +64,7 @@ impl GameOutput {
         write!(self.output, "{}{}{}", msg, msg2, color::Bg(color::Reset),).unwrap();
     }
 
-    pub fn draw_welcome_message(&mut self) {
+    pub fn draw_pre_game_message(&mut self) {
         let msg1 = cfonts::render(Options {
             text: String::from("welcome to"),
             font: Fonts::FontBlock,

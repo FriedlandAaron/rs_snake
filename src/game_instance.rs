@@ -128,7 +128,7 @@ impl GameInstance {
         }
     }
 
-    pub fn new_welcome(terminal_size: &TerminalSize) -> Self {
+    pub fn new_pre_game(terminal_size: &TerminalSize) -> Self {
         // Initialize grid
         let grid = GameGrid::new(terminal_size, 1.0);
         // Initialize snake
