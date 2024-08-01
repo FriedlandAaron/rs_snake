@@ -151,8 +151,9 @@ impl GameOutput {
             };
             write!(
                 self.output,
-                "{goto}{bgColor}{segment_char}{reset}",
+                "{goto}{fgColor}{bgColor}{segment_char}{reset}",
                 goto = cursor::Goto(segment.x, segment.y),
+                fgColor = color::Fg(color::Black),
                 bgColor = color::Bg(color::Green),
                 segment_char = segment_char,
                 reset = color::Bg(color::Reset),
