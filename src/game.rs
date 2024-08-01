@@ -49,6 +49,7 @@ enum GameState {
     PreGame,
     InProgress,
     GameOver,
+    QuitButtonPressed,
 }
 
 pub struct Game {
@@ -81,6 +82,8 @@ impl Game {
         }
     }
 
+    // state -> function for state
+    // return value = new state? or middleman function interprets return value and gives new state?
     pub fn run(&mut self) {
         loop {
             match self.state {
@@ -88,14 +91,16 @@ impl Game {
                 GameState::PreGame => {
                     let play = self.welcome();
                     if !play {
-                        break;
+                        self.state = GameState::QuitButtonPressed;
+                        continue;
                     }
                     self.state = GameState::InProgress;
                 }
                 GameState::InProgress => {
                     let quit = self.play();
                     if quit {
-                        break;
+                        self.state = GameState::QuitButtonPressed;
+                        continue;
                     }
                     self.state = GameState::GameOver;
                 }
@@ -106,8 +111,12 @@ impl Game {
                         self.restart();
                         self.state = GameState::InProgress;
                     } else {
-                        break;
+                        self.state = GameState::QuitButtonPressed;
+                        continue;
                     }
+                }
+                GameState::QuitButtonPressed => {
+                    break;
                 }
             }
         }
