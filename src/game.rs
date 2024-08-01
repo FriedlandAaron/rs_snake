@@ -12,19 +12,18 @@ struct Options {
 }
 
 impl Options {
-    fn new(args: ArgsParser) -> Self {
+    fn new(grid_size: GridSize, speed: Speed, movement_key_scheme: MovementKeyScheme) -> Self {
         Self {
-            grid_size: args.grid_size,
-            speed: args.speed,
-            movement_key_scheme: args.movement_key_scheme,
+            grid_size,
+            speed,
+            movement_key_scheme,
         }
     }
-    fn get_welcome_options() -> Self {
-        Self {
-            grid_size: GridSize::Large,
-            speed: Speed::High,
-            movement_key_scheme: MovementKeyScheme::Arrows,
-        }
+    fn from_args(args: ArgsParser) -> Self {
+        Options::new(args.grid_size, args.speed, args.movement_key_scheme)
+    }
+    fn new_pre_game() -> Self {
+        Options::new(GridSize::Large, Speed::High, MovementKeyScheme::Arrows)
     }
 }
 
@@ -72,7 +71,7 @@ impl Game {
     ) -> Game {
         let terminal_size = TerminalSize::new(terminal_size);
         let state = GameState::PreGame;
-        let options = Options::new(args);
+        let options = Options::from_args(args);
         let instance = GameInstance::new(&terminal_size, options.grid_size.value());
         Game {
             options,
