@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use termion::event::Key;
 use termion::AsyncReader;
 
-use crate::game::Direction;
+use crate::game_instance::Direction;
 use crate::parser::MovementKeyScheme;
 
 #[derive(Debug, PartialEq)]
@@ -47,7 +47,7 @@ impl GameInput {
                 keybinds.insert(Key::Left, KeyPress::DirectionKey(Direction::Left));
                 keybinds.insert(Key::Right, KeyPress::DirectionKey(Direction::Right));
             }
-            MovementKeyScheme::WSAD => {
+            MovementKeyScheme::Wsad => {
                 keybinds.insert(Key::Char('w'), KeyPress::DirectionKey(Direction::Up));
                 keybinds.insert(Key::Char('s'), KeyPress::DirectionKey(Direction::Down));
                 keybinds.insert(Key::Char('a'), KeyPress::DirectionKey(Direction::Left));
@@ -68,5 +68,9 @@ impl GameInput {
             }
             None => &KeyPress::None,
         }
+    }
+
+    pub fn empty_key_buffer(&mut self) {
+        self.input.by_ref().last();
     }
 }

@@ -1,11 +1,13 @@
-use std::collections::VecDeque;
 use std::io::{Stdout, Write};
 
 use cfonts::{Align, Colors, Fonts, Options};
 use termion::raw::RawTerminal;
 use termion::{clear, color, cursor};
 
-use crate::game::GridCell;
+use crate::game_instance::GridCell;
+use crate::game_instance::Snake;
+
+const FOOD_CHAR: char = '\u{00D3}';
 
 // TODO: still need to figure out how to abstract this part properly
 pub struct GameOutput {
@@ -24,15 +26,8 @@ impl GameOutput {
         write!(self.output, "{}{}", clear::All, cursor::Hide).unwrap();
     }
 
-    pub fn reset_terminal(&mut self) {
-        write!(
-            self.output,
-            "{}{}{}",
-            termion::cursor::Show,
-            termion::cursor::Goto(1, 1),
-            termion::clear::All
-        )
-        .unwrap();
+    pub fn show_cursor(&mut self) {
+        write!(self.output, "{}{}", cursor::Goto(1, 1), cursor::Show).unwrap();
     }
 
     pub fn draw_game_over_transition_msg(&mut self, min_y: u16, max_y: u16) {
@@ -45,7 +40,7 @@ impl GameOutput {
             spaceless: true,
             ..Options::default()
         });
-        let msg = msg.text.replace("\n", "\r\n");
+        let msg = msg.text.replace('\n', "\r\n");
         let font_block_spacing = 5;
         let height = ((min_y + max_y) / 2) - font_block_spacing;
         write!(self.output, "{}{}", termion::cursor::Goto(1, height), msg).unwrap();
@@ -58,7 +53,7 @@ impl GameOutput {
             align: Align::Center,
             ..Options::default()
         });
-        let msg = msg.text.replace("\n", "\r\n");
+        let msg = msg.text.replace('\n', "\r\n");
         let prompt = format!(
             "You reached a snake length of {len}! Would you like to play again?|Press 'p' to play again, press 'q' to quit."
         );
@@ -68,9 +63,38 @@ impl GameOutput {
             align: Align::Center,
             ..Options::default()
         });
-        let msg2 = msg2.text.replace("\n", "\r\n").to_uppercase();
+        let msg2 = msg2.text.replace('\n', "\r\n").to_uppercase();
         write!(self.output, "{}", termion::cursor::Goto(1, 1)).unwrap();
-        write!(self.output, "{}{}", msg, msg2).unwrap();
+        write!(self.output, "{}{}{}", msg, msg2, color::Bg(color::Reset),).unwrap();
+    }
+
+    pub fn draw_pre_game_message(&mut self) {
+        let msg1 = cfonts::render(Options {
+            text: String::from("welcome to"),
+            font: Fonts::FontBlock,
+            align: Align::Center,
+            colors: vec![Colors::Yellow, Colors::Candy],
+            ..Options::default()
+        });
+        let msg1 = msg1.text.replace('\n', "\r\n");
+        let msg2 = cfonts::render(Options {
+            text: String::from("snake"),
+            font: Fonts::Font3d,
+            align: Align::Center,
+            colors: vec![Colors::Green, Colors::Gray],
+            ..Options::default()
+        });
+        let msg2 = msg2.text.replace('\n', "\r\n");
+        let prompt = "|||Press 'p' to play, press 'q' to quit.".to_string();
+        let msg3 = cfonts::render(Options {
+            text: prompt,
+            font: Fonts::FontConsole,
+            align: Align::Center,
+            ..Options::default()
+        });
+        let msg3 = msg3.text.replace('\n', "\r\n").to_uppercase();
+        write!(self.output, "{}", termion::cursor::Goto(1, 1)).unwrap();
+        write!(self.output, "{}{}{}", msg1, msg2, msg3).unwrap();
     }
 
     pub fn draw_border(&mut self, xmin: u16, xmax: u16, ymin: u16, ymax: u16) {
@@ -108,18 +132,18 @@ impl GameOutput {
             goto = cursor::Goto(food.x, food.y),
             bgColor = color::Bg(color::Red),
             fgColor = color::Fg(color::LightGreen),
-            food_char = '\u{00D3}',
+            food_char = FOOD_CHAR,
             fgreset = color::Fg(color::Reset),
             bgreset = color::Bg(color::Reset),
         )
         .unwrap();
     }
 
-    pub fn draw_snake(&mut self, snake: &VecDeque<GridCell>) {
-        let mut segments: usize = 0;
-        let len = snake.len();
-        for segment in snake {
-            let segment_char = match segments {
+    pub fn draw_snake(&mut self, snake: &Snake) {
+        let body = &snake.body;
+        let len = body.len();
+        for (seg_num, segment) in body.iter().enumerate() {
+            let segment_char = match seg_num {
                 0 => 'S',
                 num if num == len - 1 => 'e',
                 1 => 'n',
@@ -128,18 +152,22 @@ impl GameOutput {
             };
             write!(
                 self.output,
-                "{goto}{bgColor}{segment_char}{reset}",
+                "{goto}{fgColor}{bgColor}{segment_char}{reset}",
                 goto = cursor::Goto(segment.x, segment.y),
+                fgColor = color::Fg(color::Black),
                 bgColor = color::Bg(color::Green),
                 segment_char = segment_char,
                 reset = color::Bg(color::Reset),
             )
             .unwrap();
-            segments += 1;
+        }
+        let tail = &snake.old_tail;
+        if let Some(x) = tail {
+            self.undraw(x)
         }
     }
 
-    pub fn undraw(&mut self, cell: &GridCell) {
+    fn undraw(&mut self, cell: &GridCell) {
         write!(self.output, "{} ", cursor::Goto(cell.x, cell.y)).unwrap();
     }
 }
